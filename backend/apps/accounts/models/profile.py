@@ -11,6 +11,8 @@ class UserProfile(models.Model):
     )
     display_name = models.CharField(max_length=150, blank=True)
     timezone = models.CharField(max_length=64, default="UTC")
+    locale = models.CharField(max_length=16, default="en-US")
+    avatar_url = models.URLField(blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
