@@ -1,16 +1,24 @@
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
 from django.db import models
+from django.db.models.functions import Lower
 from django.utils import timezone
 
 
 class UserManager(BaseUserManager):
+    def normalize_email(self, email):
+        email = super().normalize_email(email)
+        return email.lower().strip() if email else email
+
+    def get_by_natural_key(self, email):
+        return self.get(email=self.normalize_email(email), deleted_at__isnull=True)
+
     def create_user(self, email, password=None, **extra_fields):
         if not email:
             raise ValueError("Email is required.")
         if not password:
             raise ValueError("Password is required.")
 
-        email = self.normalize_email(email).lower().strip()
+        email = self.normalize_email(email)
         user = self.model(email=email, **extra_fields)
         user.set_password(password)
         user.save(using=self._db)
@@ -31,7 +39,7 @@ class UserManager(BaseUserManager):
 
 
 class User(AbstractBaseUser, PermissionsMixin):
-    email = models.EmailField(unique=True)
+    email = models.EmailField()
 
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
@@ -56,9 +64,24 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     class Meta:
         ordering = ["-date_joined"]
+        constraints = [
+            models.UniqueConstraint(
+                Lower("email"),
+                condition=models.Q(deleted_at__isnull=True),
+                name="unique_active_user_email_ci",
+            )
+        ]
 
     def __str__(self):
         return self.email
+
+    def clean(self):
+        super().clean()
+        self.email = User.objects.normalize_email(self.email)
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
 
     @property
     def is_email_verified(self):

@@ -1,0 +1,35 @@
+from .auth import (
+    ChangePasswordView,
+    CsrfTokenView,
+    DeleteAccountView,
+    EmailChangeConfirmView,
+    EmailChangeRequestView,
+    LoginView,
+    LogoutView,
+    MeView,
+    PasswordResetConfirmView,
+    PasswordResetRequestView,
+    RefreshSessionView,
+    RegisterView,
+    ResendVerificationView,
+    VerifyEmailView,
+)
+from .profile import UserProfileView
+
+__all__ = [
+    "ChangePasswordView",
+    "CsrfTokenView",
+    "DeleteAccountView",
+    "EmailChangeConfirmView",
+    "EmailChangeRequestView",
+    "LoginView",
+    "LogoutView",
+    "MeView",
+    "PasswordResetConfirmView",
+    "PasswordResetRequestView",
+    "RefreshSessionView",
+    "RegisterView",
+    "ResendVerificationView",
+    "UserProfileView",
+    "VerifyEmailView",
+]

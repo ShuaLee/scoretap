@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
 from pathlib import Path
+from datetime import timedelta
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -39,9 +40,12 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
 
     'rest_framework',
+    'rest_framework_simplejwt.token_blacklist',
     'corsheaders',
 
     'apps.accounts',
+    'apps.teams',
+    'apps.games',
 
 ]
 
@@ -127,6 +131,47 @@ STATIC_URL = 'static/'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 AUTH_USER_MODEL = 'accounts.User'
+AUTHENTICATION_BACKENDS = [
+    'apps.accounts.auth_backends.ActiveAccountBackend',
+]
+SILENCED_SYSTEM_CHECKS = ['auth.E003', 'auth.W004']
 
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'apps.accounts.auth.JWTFromCookieAuthentication',
+    ),
+    'DEFAULT_THROTTLE_CLASSES': (
+        'apps.accounts.throttles.AuthRateThrottle',
+    ),
+    'DEFAULT_THROTTLE_RATES': {
+        'auth_register': '5/hour',
+        'auth_login': '10/minute',
+        'auth_refresh': '30/minute',
+        'auth_resend_verification': '3/minute',
+        'auth_verify_email': '10/minute',
+        'auth_password_reset': '3/minute',
+        'auth_password_reset_confirm': '10/minute',
+        'auth_password_change': '5/minute',
+        'auth_email_change': '5/minute',
+        'auth_delete_account': '5/minute',
+    },
+    'EXCEPTION_HANDLER': 'apps.accounts.exceptions.accounts_exception_handler',
+}
+
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=15),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=14),
+    'ROTATE_REFRESH_TOKENS': True,
+    'BLACKLIST_AFTER_ROTATION': True,
+    'AUTH_COOKIE': 'scoretap_access',
+    'AUTH_COOKIE_REFRESH': 'scoretap_refresh',
+    'AUTH_COOKIE_PATH': '/',
+    'AUTH_COOKIE_SAMESITE': 'Lax',
+}
+
+COOKIE_SECURE = False
+FRONTEND_URL = 'http://localhost:5173'
+DEFAULT_FROM_EMAIL = 'no-reply@scoretap.local'
 
 CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_CREDENTIALS = True

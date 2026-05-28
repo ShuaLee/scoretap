@@ -15,12 +15,11 @@ class EmailVerificationTokenAdmin(admin.ModelAdmin):
         "created_at",
     )
     list_filter = ("purpose", "expires_at", "consumed_at", "created_at")
-    search_fields = ("user__email", "target_email", "token_hash")
+    search_fields = ("user__email", "target_email")
     readonly_fields = (
         "user",
         "purpose",
         "target_email",
-        "token_hash",
         "expires_at",
         "consumed_at",
         "created_at",

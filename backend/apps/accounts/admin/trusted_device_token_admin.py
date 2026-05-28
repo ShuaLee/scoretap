@@ -17,10 +17,9 @@ class TrustedDeviceTokenAdmin(admin.ModelAdmin):
         "created_at",
     )
     list_filter = ("expires_at", "revoked_at", "created_at")
-    search_fields = ("user__email", "name", "ip_address", "user_agent", "token_hash")
+    search_fields = ("user__email", "name", "ip_address", "user_agent")
     readonly_fields = (
         "user",
-        "token_hash",
         "user_agent",
         "ip_address",
         "expires_at",

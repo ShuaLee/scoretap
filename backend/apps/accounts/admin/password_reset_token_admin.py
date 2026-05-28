@@ -13,10 +13,9 @@ class PasswordResetTokenAdmin(admin.ModelAdmin):
         "created_at",
     )
     list_filter = ("expires_at", "consumed_at", "created_at")
-    search_fields = ("user__email", "token_hash")
+    search_fields = ("user__email",)
     readonly_fields = (
         "user",
-        "token_hash",
         "expires_at",
         "consumed_at",
         "created_at",

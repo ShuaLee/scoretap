@@ -1,11 +1,19 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 
-from apps.accounts.models import User
+from apps.accounts.models import User, UserProfile
+
+
+class UserProfileInline(admin.StackedInline):
+    model = UserProfile
+    can_delete = False
+    extra = 0
+    readonly_fields = ("created_at", "updated_at")
 
 
 @admin.register(User)
 class UserAdmin(BaseUserAdmin):
+    inlines = (UserProfileInline,)
     ordering = ["-date_joined"]
     list_display = (
         "email",
