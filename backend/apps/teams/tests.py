@@ -40,17 +40,17 @@ class TeamApiTests(TestCase):
         cache.clear()
         self.owner = User.objects.create_user(
             email="owner@example.com",
-            password="strong-pass-123",
+            password="Strong-pass-123!",
             email_verified_at=timezone.now(),
         )
         self.player_user = User.objects.create_user(
             email="player@example.com",
-            password="strong-pass-123",
+            password="Strong-pass-123!",
             email_verified_at=timezone.now(),
         )
         self.other_user = User.objects.create_user(
             email="other@example.com",
-            password="strong-pass-123",
+            password="Strong-pass-123!",
             email_verified_at=timezone.now(),
         )
         self.client = APIClient()
@@ -60,7 +60,7 @@ class TeamApiTests(TestCase):
     def test_owner_can_create_team_and_unassigned_player(self):
         team_response = self.client.post(
             "/api/teams/",
-            {"name": "Tap Masters", "city": "Toronto"},
+            {"name": "Tap Masters"},
             format="json",
             HTTP_X_CSRFTOKEN=self.csrf_token,
         )
@@ -172,7 +172,7 @@ class TeamApiTests(TestCase):
     def _login(self, client, email):
         response = client.post(
             "/api/accounts/auth/login/",
-            {"email": email, "password": "strong-pass-123"},
+            {"email": email, "password": "Strong-pass-123!"},
             format="json",
             HTTP_X_CSRFTOKEN=client.cookies["csrftoken"].value,
         )

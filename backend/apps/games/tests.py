@@ -4,7 +4,7 @@ from django.utils import timezone
 from rest_framework.test import APIClient
 
 from apps.accounts.models import User
-from apps.games.models import Game
+from apps.games.models import Game, GamePlayer, GameTeam
 from apps.teams.models import Team, TeamPlayer
 
 
@@ -41,17 +41,17 @@ class GameScheduleApiTests(TestCase):
         cache.clear()
         self.owner = User.objects.create_user(
             email="owner@example.com",
-            password="strong-pass-123",
+            password="Strong-pass-123!",
             email_verified_at=timezone.now(),
         )
         self.player_user = User.objects.create_user(
             email="player@example.com",
-            password="strong-pass-123",
+            password="Strong-pass-123!",
             email_verified_at=timezone.now(),
         )
         self.other_user = User.objects.create_user(
             email="other@example.com",
-            password="strong-pass-123",
+            password="Strong-pass-123!",
             email_verified_at=timezone.now(),
         )
         self.team = Team.objects.create(owner=self.owner, name="Tap Masters")
@@ -79,11 +79,103 @@ class GameScheduleApiTests(TestCase):
 
         self.assertEqual(response.status_code, 201)
         self.assertEqual(response.data["matchup_label"], "vs. Rattlesnakes")
+        self.assertEqual(response.data["game_type"], Game.GameType.TEAM)
         self.assertEqual(response.data["status"], Game.Status.SCHEDULED)
+
+    def test_user_can_create_quick_game_without_team(self):
+        response = self.client.post(
+            "/api/games/",
+            {
+                "opponent_name": "Pickup Crew",
+                "game_date": "2027-05-07",
+                "tracking_mode": Game.TrackingMode.BOTH_TEAMS,
+                "number_of_innings": 5,
+            },
+            format="json",
+            HTTP_X_CSRFTOKEN=self.client.cookies["csrftoken"].value,
+        )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data["game_type"], Game.GameType.QUICK)
+        self.assertEqual(response.data["tracking_mode"], Game.TrackingMode.BOTH_TEAMS)
+        self.assertEqual(response.data["number_of_innings"], 5)
+        self.assertIsNone(response.data["team"])
+
+        game = Game.objects.get(pk=response.data["id"])
+        self.assertEqual(game.created_by, self.owner)
+        self.assertIsNone(game.team)
+
+    def test_owner_can_configure_quick_game_teams_and_lineup(self):
+        game = Game.objects.create(
+            created_by=self.owner,
+            opponent_name="Pickup Crew",
+            game_date="2027-05-07",
+            tracking_mode=Game.TrackingMode.BOTH_TEAMS,
+        )
+
+        home_response = self.client.post(
+            f"/api/games/{game.id}/teams/",
+            {
+                "side": GameTeam.Side.HOME,
+                "display_name": "My Team",
+                "is_tracked": True,
+            },
+            format="json",
+            HTTP_X_CSRFTOKEN=self.client.cookies["csrftoken"].value,
+        )
+        self.assertEqual(home_response.status_code, 201)
+
+        away_response = self.client.post(
+            f"/api/games/{game.id}/teams/",
+            {
+                "side": GameTeam.Side.AWAY,
+                "display_name": "Pickup Crew",
+                "is_tracked": True,
+            },
+            format="json",
+            HTTP_X_CSRFTOKEN=self.client.cookies["csrftoken"].value,
+        )
+        self.assertEqual(away_response.status_code, 201)
+
+        player_response = self.client.post(
+            f"/api/games/{game.id}/teams/{home_response.data['id']}/players/",
+            {
+                "display_name": "Jake",
+                "batting_order": 1,
+            },
+            format="json",
+            HTTP_X_CSRFTOKEN=self.client.cookies["csrftoken"].value,
+        )
+        self.assertEqual(player_response.status_code, 201)
+        self.assertEqual(player_response.data["display_name"], "Jake")
+        self.assertEqual(player_response.data["batting_order"], 1)
+
+        self.assertEqual(GameTeam.objects.filter(game=game).count(), 2)
+        self.assertEqual(GamePlayer.objects.filter(game_team_id=home_response.data["id"]).count(), 1)
+
+    def test_unrelated_user_cannot_configure_quick_game(self):
+        game = Game.objects.create(
+            created_by=self.owner,
+            opponent_name="Pickup Crew",
+            game_date="2027-05-07",
+        )
+        other_client = APIClient()
+        self._csrf_token(other_client)
+        self._login(other_client, "other@example.com")
+
+        response = other_client.post(
+            f"/api/games/{game.id}/teams/",
+            {"side": GameTeam.Side.HOME, "display_name": "Other Team"},
+            format="json",
+            HTTP_X_CSRFTOKEN=other_client.cookies["csrftoken"].value,
+        )
+
+        self.assertEqual(response.status_code, 403)
 
     def test_owner_can_change_scheduled_game_date(self):
         game = Game.objects.create(
             team=self.team,
+            game_type=Game.GameType.TEAM,
             created_by=self.owner,
             opponent_name="Rattlesnakes",
             game_date="2027-05-07",
@@ -102,6 +194,7 @@ class GameScheduleApiTests(TestCase):
     def test_owner_can_start_scheduled_game(self):
         game = Game.objects.create(
             team=self.team,
+            game_type=Game.GameType.TEAM,
             created_by=self.owner,
             opponent_name="Rattlesnakes",
             game_date="2027-05-07",
@@ -122,6 +215,7 @@ class GameScheduleApiTests(TestCase):
     def test_delete_cancels_scheduled_game_and_hides_by_default(self):
         game = Game.objects.create(
             team=self.team,
+            game_type=Game.GameType.TEAM,
             created_by=self.owner,
             opponent_name="Rattlesnakes",
             game_date="2027-05-07",
@@ -150,6 +244,7 @@ class GameScheduleApiTests(TestCase):
     def test_linked_player_can_view_but_not_schedule_or_start_game(self):
         game = Game.objects.create(
             team=self.team,
+            game_type=Game.GameType.TEAM,
             created_by=self.owner,
             opponent_name="Rattlesnakes",
             game_date="2027-05-07",
@@ -181,6 +276,7 @@ class GameScheduleApiTests(TestCase):
     def test_unrelated_user_cannot_view_game(self):
         game = Game.objects.create(
             team=self.team,
+            game_type=Game.GameType.TEAM,
             created_by=self.owner,
             opponent_name="Rattlesnakes",
             game_date="2027-05-07",
@@ -200,7 +296,7 @@ class GameScheduleApiTests(TestCase):
     def _login(self, client, email):
         response = client.post(
             "/api/accounts/auth/login/",
-            {"email": email, "password": "strong-pass-123"},
+            {"email": email, "password": "Strong-pass-123!"},
             format="json",
             HTTP_X_CSRFTOKEN=client.cookies["csrftoken"].value,
         )

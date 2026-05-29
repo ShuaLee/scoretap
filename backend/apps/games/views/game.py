@@ -1,9 +1,10 @@
 from django.shortcuts import get_object_or_404
 from rest_framework.exceptions import PermissionDenied
-from rest_framework.generics import ListAPIView, ListCreateAPIView, RetrieveUpdateDestroyAPIView
+from rest_framework.generics import ListCreateAPIView, RetrieveUpdateDestroyAPIView
 from rest_framework.permissions import IsAuthenticated
 
 from apps.games.models import Game
+from apps.games.permissions import can_manage_game, can_view_game
 from apps.games.serializers import GameSerializer
 from apps.teams.models import Team
 from apps.teams.permissions import can_manage_team, can_view_team
@@ -12,20 +13,25 @@ from apps.teams.permissions import can_manage_team, can_view_team
 class GameQuerysetMixin:
     def visible_games(self):
         user = self.request.user
-        queryset = Game.objects.select_related("team", "created_by").filter(
-            team__archived_at__isnull=True,
-        )
+        queryset = Game.objects.select_related("team", "created_by")
         if self.request.query_params.get("include_cancelled") != "true":
             queryset = queryset.exclude(status=Game.Status.CANCELLED)
-        return queryset.filter(
+        team_games = queryset.filter(
+            team__archived_at__isnull=True,
             team__owner=user,
         ) | queryset.filter(
+            team__archived_at__isnull=True,
             team__players__linked_user=user,
             team__players__is_active=True,
         )
+        quick_games = queryset.filter(
+            game_type=Game.GameType.QUICK,
+            created_by=user,
+        )
+        return team_games | quick_games
 
 
-class GameListView(GameQuerysetMixin, ListAPIView):
+class GameListView(GameQuerysetMixin, ListCreateAPIView):
     serializer_class = GameSerializer
     permission_classes = [IsAuthenticated]
 
@@ -35,6 +41,13 @@ class GameListView(GameQuerysetMixin, ListAPIView):
         if team_id:
             queryset = queryset.filter(team_id=team_id)
         return queryset
+
+    def perform_create(self, serializer):
+        serializer.save(
+            created_by=self.request.user,
+            game_type=Game.GameType.QUICK,
+            team=None,
+        )
 
 
 class TeamGameListCreateView(ListCreateAPIView):
@@ -58,7 +71,11 @@ class TeamGameListCreateView(ListCreateAPIView):
         team = self.get_team()
         if not can_manage_team(self.request.user, team):
             raise PermissionDenied("You do not have permission to schedule games for this team.")
-        serializer.save(team=team, created_by=self.request.user)
+        serializer.save(
+            team=team,
+            created_by=self.request.user,
+            game_type=Game.GameType.TEAM,
+        )
 
 
 class GameDetailView(RetrieveUpdateDestroyAPIView):
@@ -71,17 +88,17 @@ class GameDetailView(RetrieveUpdateDestroyAPIView):
 
     def get_object(self):
         game = super().get_object()
-        if not can_view_team(self.request.user, game.team):
+        if not can_view_game(self.request.user, game):
             raise PermissionDenied("You do not have access to this game.")
         return game
 
     def perform_update(self, serializer):
         game = self.get_object()
-        if not can_manage_team(self.request.user, game.team):
+        if not can_manage_game(self.request.user, game):
             raise PermissionDenied("You do not have permission to edit this game.")
         serializer.save()
 
     def perform_destroy(self, instance):
-        if not can_manage_team(self.request.user, instance.team):
+        if not can_manage_game(self.request.user, instance):
             raise PermissionDenied("You do not have permission to delete this game.")
         instance.cancel()

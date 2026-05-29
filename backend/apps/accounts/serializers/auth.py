@@ -23,15 +23,24 @@ class UserSerializer(serializers.ModelSerializer):
 class RegisterSerializer(serializers.Serializer):
     email = serializers.EmailField()
     password = serializers.CharField(write_only=True, trim_whitespace=False, min_length=8)
-    display_name = serializers.CharField(required=False, allow_blank=True, max_length=150)
+    display_name = serializers.CharField(max_length=150)
     timezone = serializers.CharField(required=False, allow_blank=True, max_length=64)
     locale = serializers.CharField(required=False, allow_blank=True, max_length=16)
 
     def validate_email(self, value):
-        return User.objects.normalize_email(value)
+        email = User.objects.normalize_email(value)
+        if User.objects.filter(email__iexact=email, deleted_at__isnull=True).exists():
+            raise serializers.ValidationError("Email is already registered.")
+        return email
 
     def validate_password(self, value):
         validate_password(value)
+        return value
+
+    def validate_display_name(self, value):
+        value = value.strip()
+        if not value:
+            raise serializers.ValidationError("Display name is required.")
         return value
 
 

@@ -9,7 +9,6 @@ class Team(models.Model):
         related_name="owned_teams",
     )
     name = models.CharField(max_length=150)
-    city = models.CharField(max_length=100, blank=True)
     notes = models.TextField(blank=True)
     archived_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)

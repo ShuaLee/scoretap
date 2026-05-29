@@ -39,7 +39,7 @@ TEST_REST_FRAMEWORK = {
 
 class UserModelTests(TestCase):
     def test_user_email_is_normalized_and_profile_is_created(self):
-        user = User.objects.create_user(email="  TEST@Example.COM  ", password="secret123")
+        user = User.objects.create_user(email="  TEST@Example.COM  ", password="Secret-123!")
 
         self.assertEqual(user.email, "test@example.com")
         self.assertTrue(UserProfile.objects.filter(user=user).exists())
@@ -47,31 +47,31 @@ class UserModelTests(TestCase):
     def test_soft_deleted_email_can_be_reused(self):
         deleted_user = User.objects.create_user(
             email="player@example.com",
-            password="secret123",
+            password="Secret-123!",
             deleted_at=timezone.now(),
         )
         active_user = User.objects.create_user(
             email="PLAYER@example.com",
-            password="secret123",
+            password="Secret-123!",
         )
 
         self.assertNotEqual(deleted_user.id, active_user.id)
         self.assertEqual(active_user.email, "player@example.com")
 
     def test_active_email_is_unique_case_insensitively(self):
-        User.objects.create_user(email="player@example.com", password="secret123")
+        User.objects.create_user(email="player@example.com", password="Secret-123!")
 
         with self.assertRaises(Exception):
-            User.objects.create_user(email="PLAYER@example.com", password="secret123")
+            User.objects.create_user(email="PLAYER@example.com", password="Secret-123!")
 
 
 class AccountRecoveryRequestAdminTests(TestCase):
     def test_mark_approved_updates_user_email(self):
         admin_user = User.objects.create_superuser(
             email="admin@example.com",
-            password="secret123",
+            password="Secret-123!",
         )
-        user = User.objects.create_user(email="old@example.com", password="secret123")
+        user = User.objects.create_user(email="old@example.com", password="Secret-123!")
         recovery_request = AccountRecoveryRequest.objects.create(
             user=user,
             current_email="old@example.com",
@@ -118,7 +118,7 @@ class AccountApiTests(TestCase):
             "/api/accounts/auth/register/",
             {
                 "email": "CASEY@example.com",
-                "password": "strong-pass-123",
+                "password": "Strong-pass-123!",
                 "display_name": "Casey",
                 "timezone": "America/Toronto",
                 "locale": "en-CA",
@@ -129,10 +129,12 @@ class AccountApiTests(TestCase):
 
         self.assertEqual(register_response.status_code, 201)
         self.assertEqual(register_response.data["user"]["email"], "casey@example.com")
+        self.assertIn("scoretap_access", client.cookies)
+        self.assertIn("scoretap_refresh", client.cookies)
 
         login_response = client.post(
             "/api/accounts/auth/login/",
-            {"email": "casey@example.com", "password": "strong-pass-123"},
+            {"email": "casey@example.com", "password": "Strong-pass-123!"},
             format="json",
             HTTP_X_CSRFTOKEN=csrf_token,
         )
@@ -156,7 +158,11 @@ class AccountApiTests(TestCase):
     def test_duplicate_registration_returns_consistent_error_shape(self):
         client = APIClient()
         csrf_token = self._csrf_token(client)
-        payload = {"email": "dup@example.com", "password": "strong-pass-123"}
+        payload = {
+            "email": "dup@example.com",
+            "password": "Strong-pass-123!",
+            "display_name": "Duplicate",
+        }
 
         self.assertEqual(
             client.post(
@@ -178,15 +184,36 @@ class AccountApiTests(TestCase):
         self.assertEqual(response.data["error"]["code"], "invalid")
         self.assertEqual(
             response.data["error"]["message"],
-            "Email is already registered.",
+            "Please check the submitted values.",
         )
-        self.assertEqual(response.data["error"]["fields"], {})
+        self.assertEqual(
+            response.data["error"]["fields"],
+            {"email": ["Email is already registered."]},
+        )
+
+    def test_registration_requires_complex_password(self):
+        client = APIClient()
+        csrf_token = self._csrf_token(client)
+
+        response = client.post(
+            "/api/accounts/auth/register/",
+            {
+                "email": "weak@example.com",
+                "password": "weakpass",
+                "display_name": "Weak Password",
+            },
+            format="json",
+            HTTP_X_CSRFTOKEN=csrf_token,
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("uppercase", response.data["error"]["fields"]["password"][0])
 
     def test_register_without_csrf_fails_with_consistent_error_shape(self):
         client = APIClient(enforce_csrf_checks=True)
         response = client.post(
             "/api/accounts/auth/register/",
-            {"email": "csrf@example.com", "password": "strong-pass-123"},
+            {"email": "csrf@example.com", "password": "Strong-pass-123!"},
             format="json",
         )
 
@@ -203,7 +230,7 @@ class AccountApiTests(TestCase):
         csrf_token = self._csrf_token(client)
         User.objects.create_user(
             email="locked@example.com",
-            password="strong-pass-123",
+            password="Strong-pass-123!",
             email_verified_at=timezone.now(),
         )
 
@@ -224,7 +251,7 @@ class AccountApiTests(TestCase):
         csrf_token = self._csrf_token(client)
         User.objects.create_user(
             email="deleted@example.com",
-            password="strong-pass-123",
+            password="Strong-pass-123!",
             email_verified_at=timezone.now(),
             is_active=False,
             deleted_at=timezone.now(),
@@ -232,7 +259,7 @@ class AccountApiTests(TestCase):
 
         response = client.post(
             "/api/accounts/auth/login/",
-            {"email": "deleted@example.com", "password": "strong-pass-123"},
+            {"email": "deleted@example.com", "password": "Strong-pass-123!"},
             format="json",
             HTTP_X_CSRFTOKEN=csrf_token,
         )
@@ -243,7 +270,7 @@ class AccountApiTests(TestCase):
     def test_invalid_email_verification_code_returns_consistent_error_shape(self):
         client = APIClient()
         csrf_token = self._csrf_token(client)
-        User.objects.create_user(email="verify@example.com", password="strong-pass-123")
+        User.objects.create_user(email="verify@example.com", password="Strong-pass-123!")
 
         response = client.post(
             "/api/accounts/auth/email/verify/",
@@ -261,7 +288,7 @@ class AccountApiTests(TestCase):
 
         response = client.post(
             "/api/accounts/auth/password/reset/confirm/",
-            {"token": "not-real", "new_password": "new-strong-pass-123"},
+            {"token": "not-real", "new_password": "new-Strong-pass-123!"},
             format="json",
             HTTP_X_CSRFTOKEN=csrf_token,
         )
@@ -274,13 +301,13 @@ class AccountApiTests(TestCase):
         csrf_token = self._csrf_token(client)
         User.objects.create_user(
             email="session@example.com",
-            password="strong-pass-123",
+            password="Strong-pass-123!",
             email_verified_at=timezone.now(),
         )
 
         login_response = client.post(
             "/api/accounts/auth/login/",
-            {"email": "session@example.com", "password": "strong-pass-123"},
+            {"email": "session@example.com", "password": "Strong-pass-123!"},
             format="json",
             HTTP_X_CSRFTOKEN=csrf_token,
         )
@@ -332,7 +359,7 @@ class AccountApiTests(TestCase):
             csrf_token = self._csrf_token(client)
             User.objects.create_user(
                 email="throttle@example.com",
-                password="strong-pass-123",
+                password="Strong-pass-123!",
                 email_verified_at=timezone.now(),
             )
 

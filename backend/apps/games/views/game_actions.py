@@ -6,8 +6,8 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.games.models import Game
+from apps.games.permissions import can_manage_game, can_view_game
 from apps.games.serializers import GameSerializer
-from apps.teams.permissions import can_manage_team, can_view_team
 
 
 class StartGameView(APIView):
@@ -15,9 +15,9 @@ class StartGameView(APIView):
 
     def post(self, request, pk):
         game = get_object_or_404(Game.objects.select_related("team", "created_by"), pk=pk)
-        if not can_view_team(request.user, game.team):
+        if not can_view_game(request.user, game):
             raise PermissionDenied("You do not have access to this game.")
-        if not can_manage_team(request.user, game.team):
+        if not can_manage_game(request.user, game):
             raise PermissionDenied("You do not have permission to start this game.")
         if game.status != Game.Status.SCHEDULED:
             raise ValidationError("Only scheduled games can be started.")

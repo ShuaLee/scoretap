@@ -67,7 +67,7 @@ class RegisterView(APIView):
             user = AuthService.register_user(
                 email=data["email"],
                 password=data["password"],
-                display_name=data.get("display_name", ""),
+                display_name=data["display_name"],
                 timezone_name=data.get("timezone") or "UTC",
                 locale=data.get("locale") or "en-US",
                 request=request,
@@ -75,13 +75,15 @@ class RegisterView(APIView):
         except DjangoValidationError as exc:
             raise ValidationError(exc.messages) from exc
 
-        return Response(
+        refresh = RefreshToken.for_user(user)
+        response = Response(
             {
-                "detail": "Registration successful. Please verify your email.",
+                "detail": "Registration successful.",
                 "user": UserSerializer(user).data,
             },
             status=status.HTTP_201_CREATED,
         )
+        return set_auth_cookies(response, refresh.access_token, refresh)
 
 
 class LoginView(APIView):

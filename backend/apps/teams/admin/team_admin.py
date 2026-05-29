@@ -16,9 +16,9 @@ class TeamPlayerInline(admin.TabularInline):
 
 @admin.register(Team)
 class TeamAdmin(admin.ModelAdmin):
-    list_display = ("name", "owner_email", "city", "is_archived", "created_at")
+    list_display = ("name", "owner_email", "is_archived", "created_at")
     list_filter = ("archived_at", "created_at")
-    search_fields = ("name", "city", "owner__email")
+    search_fields = ("name", "owner__email")
     readonly_fields = ("created_at", "updated_at")
     inlines = (TeamPlayerInline,)
 

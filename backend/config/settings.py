@@ -103,6 +103,9 @@ AUTH_PASSWORD_VALIDATORS = [
         'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
     },
     {
+        'NAME': 'apps.accounts.validators.PasswordComplexityValidator',
+    },
+    {
         'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
     },
     {
@@ -144,8 +147,8 @@ REST_FRAMEWORK = {
         'apps.accounts.throttles.AuthRateThrottle',
     ),
     'DEFAULT_THROTTLE_RATES': {
-        'auth_register': '5/hour',
-        'auth_login': '10/minute',
+        'auth_register': '100/minute' if DEBUG else '5/hour',
+        'auth_login': '100/minute' if DEBUG else '10/minute',
         'auth_refresh': '30/minute',
         'auth_resend_verification': '3/minute',
         'auth_verify_email': '10/minute',
@@ -172,6 +175,13 @@ SIMPLE_JWT = {
 COOKIE_SECURE = False
 FRONTEND_URL = 'http://localhost:5173'
 DEFAULT_FROM_EMAIL = 'no-reply@scoretap.local'
+EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+AUTH_REQUIRE_EMAIL_VERIFICATION = False if DEBUG else True
 
 CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOW_CREDENTIALS = True
+
+CSRF_TRUSTED_ORIGINS = [
+    'http://127.0.0.1:5173',
+    'http://localhost:5173',
+]

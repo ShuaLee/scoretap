@@ -13,7 +13,6 @@ class TeamSerializer(serializers.ModelSerializer):
         fields = (
             "id",
             "name",
-            "city",
             "notes",
             "owner",
             "owner_email",
