@@ -22,4 +22,5 @@ urlpatterns = [
     path('api/accounts/', include('apps.accounts.urls')),
     path('api/teams/', include('apps.teams.urls')),
     path('api/games/', include('apps.games.urls')),
+    path('api/waitlist/', include('apps.waitlist.urls')),
 ]

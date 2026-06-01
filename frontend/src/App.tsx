@@ -1,84 +1,28 @@
-import { useEffect, useState } from 'react'
-import {
-  getCurrentUser,
-  logout,
-  refreshSession,
-  type User,
-} from './api'
-import { AppFooter } from './components/AppFooter'
-import { AppHeader } from './components/AppHeader'
-import { AuthScreen } from './features/auth/AuthScreen'
-import { Dashboard } from './features/dashboard/Dashboard'
-import { NewGameFlow } from './features/new-game/NewGameFlow'
-import './App.css'
+import { useState } from 'react'
+import { Footer } from './components/Footer'
+import { MainArea } from './components/MainArea'
+import { TopNav } from './components/TopNav'
+import { GameSetupPage } from './pages/GameSetupPage'
+import { HomePage } from './pages/HomePage'
+import { ScoreGamePage } from './pages/ScoreGamePage'
 
-type View = 'home' | 'new-game'
+type Page = 'home' | 'game-setup' | 'score-game'
 
-function App() {
-  const [user, setUser] = useState<User | null>(null)
-  const [view, setView] = useState<View>('home')
-  const [profileMenuOpen, setProfileMenuOpen] = useState(false)
-  const [isLoading, setIsLoading] = useState(true)
+export default function App() {
+  const [page, setPage] = useState<Page>('home')
 
-  useEffect(() => {
-    async function restoreSession() {
-      try {
-        const current = await getCurrentUser()
-        setUser(current.user)
-      } catch {
-        try {
-          await refreshSession()
-          const current = await getCurrentUser()
-          setUser(current.user)
-        } catch {
-          setUser(null)
-        }
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
-    restoreSession()
-  }, [])
-
-  async function handleLogout() {
-    try {
-      await logout()
-    } finally {
-      setUser(null)
-      setProfileMenuOpen(false)
-      setView('home')
-    }
-  }
-
-  if (isLoading) {
-    return <main className="app app-center">Loading</main>
-  }
-
-  if (!user) {
-    return <AuthScreen onAuthenticated={setUser} />
+  if (page === 'score-game') {
+    return <ScoreGamePage />
   }
 
   return (
-    <main className="app">
-      <AppHeader
-        user={user}
-        title={view === 'new-game' ? 'New Game' : undefined}
-        profileMenuOpen={profileMenuOpen}
-        onBack={view === 'new-game' ? () => setView('home') : undefined}
-        onLogout={handleLogout}
-        onToggleProfileMenu={() => setProfileMenuOpen((isOpen) => !isOpen)}
-      />
-
-      {view === 'home' ? (
-        <Dashboard onNewGame={() => setView('new-game')} />
-      ) : (
-        <NewGameFlow onFinished={() => setView('home')} />
-      )}
-
-      <AppFooter />
-    </main>
+    <div className="app-shell">
+      <TopNav />
+      <MainArea>
+        {page === 'home' && <HomePage onStartGame={() => setPage('game-setup')} />}
+        {page === 'game-setup' && <GameSetupPage onBeginGame={() => setPage('score-game')} />}
+      </MainArea>
+      <Footer />
+    </div>
   )
 }
-
-export default App

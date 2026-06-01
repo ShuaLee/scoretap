@@ -46,6 +46,7 @@ INSTALLED_APPS = [
     'apps.accounts',
     'apps.teams',
     'apps.games',
+    'apps.waitlist',
 
 ]
 
