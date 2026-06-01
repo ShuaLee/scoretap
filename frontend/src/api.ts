@@ -24,13 +24,30 @@ export type User = {
 
 export type Game = {
   id: number
-  game_type: 'quick' | 'team'
+  game_type: 'quick' | 'team' | 'league'
   tracking_mode: 'own_team' | 'both_teams'
   team: number | null
   opponent_name: string
   number_of_innings: number
   game_date: string
   status: string
+}
+
+export type Team = {
+  id: number
+  name: string
+  notes: string
+  active_player_count: number
+}
+
+export type TeamPlayer = {
+  id: number
+  team: number
+  display_name: string
+  linked_user_id: number | null
+  is_assigned: boolean
+  jersey_number: string
+  is_active: boolean
 }
 
 export type GameTeam = {
@@ -153,10 +170,59 @@ export async function createQuickGame(input: {
   })
 }
 
+export async function listTeams() {
+  return request<Team[]>('/teams/')
+}
+
+export async function createTeam(input: {
+  name: string
+  notes?: string
+}) {
+  await ensureCsrf()
+  return request<Team>('/teams/', {
+    method: 'POST',
+    csrf: true,
+    body: input,
+  })
+}
+
+export async function listTeamPlayers(teamId: number) {
+  return request<TeamPlayer[]>(`/teams/${teamId}/players/`)
+}
+
+export async function createTeamPlayer(teamId: number, input: {
+  display_name: string
+  jersey_number?: string
+}) {
+  await ensureCsrf()
+  return request<TeamPlayer>(`/teams/${teamId}/players/`, {
+    method: 'POST',
+    csrf: true,
+    body: input,
+  })
+}
+
+export async function createTeamGame(teamId: number, input: {
+  opponent_name: string
+  game_date: string
+  number_of_innings: number
+  tracking_mode: Game['tracking_mode']
+  location?: string
+  notes?: string
+}) {
+  await ensureCsrf()
+  return request<Game>(`/teams/${teamId}/games/`, {
+    method: 'POST',
+    csrf: true,
+    body: input,
+  })
+}
+
 export async function createGameTeam(gameId: number, input: {
   side: GameTeam['side']
   display_name: string
   is_tracked: boolean
+  linked_team?: number | null
 }) {
   await ensureCsrf()
   return request<GameTeam>(`/games/${gameId}/teams/`, {
@@ -169,11 +235,21 @@ export async function createGameTeam(gameId: number, input: {
 export async function createGamePlayer(gameId: number, gameTeamId: number, input: {
   display_name: string
   batting_order: number
+  linked_team_player?: number | null
 }) {
   await ensureCsrf()
   return request(`/games/${gameId}/teams/${gameTeamId}/players/`, {
     method: 'POST',
     csrf: true,
     body: input,
+  })
+}
+
+export async function startGame(gameId: number) {
+  await ensureCsrf()
+  return request<Game>(`/games/${gameId}/start/`, {
+    method: 'POST',
+    csrf: true,
+    body: {},
   })
 }

@@ -9,6 +9,7 @@ class Game(models.Model):
     class GameType(models.TextChoices):
         QUICK = "quick", "Quick Game"
         TEAM = "team", "Team Game"
+        LEAGUE = "league", "League Game"
 
     class TrackingMode(models.TextChoices):
         OWN_TEAM = "own_team", "Own Team"
