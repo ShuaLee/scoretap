@@ -3,16 +3,27 @@
 }
 
 :root {
-  --color-primary: #2563eb;
-  --color-primary-hover: #1d4ed8;
+  --color-primary: #d09040;
+  --color-primary-hover: #b8792f;
+  --color-primary-rgb: 208, 144, 64;
+  --color-gold: #dca044;
+  --color-gold-light: #f0c090;
+  --color-dark-green: #12382c;
+  --color-navy: #001020;
+  --color-navy-soft: #101020;
+  --color-cream: #fffaf3;
+  --color-surface: #fffcf7;
+  --color-border: #eadcc8;
+  --color-text: #17212b;
+  --color-muted: #6a5f52;
 }
 
 body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
-  background: #ffffff;
-  color: #1f2933;
+  background: var(--color-surface);
+  color: var(--color-text);
   font-family:
     Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
     sans-serif;
@@ -20,8 +31,9 @@ body {
 
 .app-shell {
   display: grid;
-  grid-template-rows: 72px 1fr 64px;
+  grid-template-rows: 1fr 64px;
   min-height: 100vh;
+  padding-top: 72px;
 }
 
 .top-nav,
@@ -31,8 +43,12 @@ body {
 }
 
 .top-nav {
-  border-bottom: 1px solid #d8dee5;
-  background: #ffffff;
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 20;
+  height: 72px;
+  background: var(--color-surface);
 }
 
 .top-nav-inner {
@@ -51,24 +67,18 @@ body {
   gap: 6px;
 }
 
-.logo-mark {
-  display: grid;
-  place-items: center;
-  width: 34px;
-  height: 34px;
-  border-radius: 9px;
-  background: var(--color-primary);
-  color: #ffffff;
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0;
+.logo-image {
+  display: block;
+  width: auto;
+  height: 52px;
+  object-fit: contain;
 }
 
 .logo-beta {
-  margin-top: 3px;
-  color: var(--color-primary);
+  margin-top: 6px;
+  color: var(--color-gold);
   font-size: 10px;
-  font-weight: 600;
+  font-weight: 700;
   letter-spacing: 0.04em;
 }
 
@@ -78,29 +88,32 @@ body {
   gap: 10px;
 }
 
-.waitlist-button {
+.waitlist-button,
+.new-game-button {
   min-height: 40px;
-  border: 1px solid var(--color-primary);
+  border: 1px solid var(--color-gold);
   border-radius: 999px;
   font: inherit;
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 700;
   padding: 8px 18px;
   text-transform: uppercase;
   cursor: pointer;
 }
 
-.waitlist-button {
-  background: #ffffff;
-  color: var(--color-primary);
+.new-game-button {
+  background: var(--color-gold);
+  color: #ffffff;
 }
 
-.waitlist-button:hover {
-  background: rgba(37, 99, 235, 0.06);
+.waitlist-button {
+  border-width: 2px;
+  background: transparent;
+  color: var(--color-gold);
 }
 
 .main-area {
-  background: #ffffff;
+  background: var(--color-surface);
 }
 
 .home-page {
@@ -121,7 +134,7 @@ body {
 .home-kicker {
   display: inline-flex;
   margin-bottom: 16px;
-  color: var(--color-primary);
+  color: var(--color-dark-green);
   font-size: 13px;
   font-weight: 600;
   text-transform: uppercase;
@@ -129,7 +142,7 @@ body {
 
 .home-copy h1 {
   margin: 0;
-  color: #111827;
+  color: var(--color-navy);
   font-size: clamp(38px, 6vw, 64px);
   font-weight: 650;
   letter-spacing: -0.03em;
@@ -139,7 +152,7 @@ body {
 .home-copy p {
   max-width: 520px;
   margin: 22px 0 0;
-  color: #475569;
+  color: var(--color-muted);
   font-size: 18px;
   line-height: 1.55;
 }
@@ -155,7 +168,7 @@ body {
 .home-start-button {
   align-self: flex-start;
   min-height: 44px;
-  border: 1px solid var(--color-primary);
+  border: 1px solid var(--color-dark-green);
   border-radius: 999px;
   background: var(--color-primary);
   color: #ffffff;
@@ -181,9 +194,9 @@ body {
 .home-waitlist-form input {
   min-width: 0;
   min-height: 44px;
-  border: 1px solid #d8dee5;
+  border: 1px solid var(--color-border);
   border-radius: 999px;
-  color: #17212b;
+  color: var(--color-text);
   font: inherit;
   padding: 0 16px;
   outline: none;
@@ -195,15 +208,15 @@ body {
 
 .home-waitlist-form input:focus {
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+  box-shadow: 0 0 0 3px rgba(var(--color-primary-rgb), 0.18);
 }
 
 .home-waitlist-form button {
   min-height: 44px;
-  border: 1px solid var(--color-primary);
+  border: 1px solid var(--color-dark-green);
   border-radius: 999px;
-  background: #ffffff;
-  color: var(--color-primary);
+  background: var(--color-surface);
+  color: var(--color-dark-green);
   font: inherit;
   font-size: 13px;
   font-weight: 600;
@@ -213,7 +226,7 @@ body {
 }
 
 .home-waitlist-form button:hover {
-  background: rgba(37, 99, 235, 0.06);
+  background: rgba(var(--color-primary-rgb), 0.1);
 }
 
 .home-mockup {
@@ -222,8 +235,8 @@ body {
   min-height: 420px;
   border-radius: 28px;
   background:
-    radial-gradient(circle at 50% 40%, rgba(37, 99, 235, 0.12), transparent 48%),
-    #f8fafc;
+    radial-gradient(circle at 50% 40%, rgba(var(--color-primary-rgb), 0.18), transparent 48%),
+    #f7efe3;
 }
 
 .home-mockup svg {
@@ -253,7 +266,7 @@ body {
 }
 
 .setup-flow-header span {
-  color: #64748b;
+  color: var(--color-muted);
   font-size: 13px;
   font-weight: 600;
   text-transform: uppercase;
@@ -261,7 +274,7 @@ body {
 
 .setup-flow-header h1 {
   margin: 4px 0 0;
-  color: #17212b;
+  color: var(--color-navy);
   font-size: 28px;
   font-weight: 650;
   letter-spacing: -0.02em;
@@ -271,16 +284,16 @@ body {
   display: inline-grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   overflow: hidden;
-  border: 1px solid #d8dee5;
+  border: 1px solid var(--color-border);
   border-radius: 999px;
-  background: #f8fafc;
+  background: #f7efe3;
 }
 
 .setup-step-nav button {
   min-height: 36px;
   border: 0;
   background: transparent;
-  color: #64748b;
+  color: var(--color-muted);
   font: inherit;
   font-size: 12px;
   font-weight: 600;
@@ -295,7 +308,7 @@ body {
 }
 
 .setup-flow-card {
-  border: 1px solid #d8dee5;
+  border: 1px solid var(--color-border);
   border-radius: 14px;
   background: #ffffff;
   padding: 22px;
@@ -320,10 +333,10 @@ body {
   flex-direction: column;
   gap: 8px;
   min-height: 128px;
-  border: 1px solid #d8dee5;
+  border: 1px solid var(--color-border);
   border-radius: 12px;
   background: #ffffff;
-  color: #17212b;
+  color: var(--color-text);
   font: inherit;
   padding: 16px;
   text-align: left;
@@ -336,14 +349,14 @@ body {
 }
 
 .setup-option span {
-  color: #64748b;
+  color: var(--color-muted);
   font-size: 14px;
   line-height: 1.4;
 }
 
 .setup-option.active {
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+  box-shadow: 0 0 0 3px rgba(var(--color-primary-rgb), 0.18);
 }
 
 .setup-field {
@@ -353,7 +366,7 @@ body {
 }
 
 .setup-field > span {
-  color: #475569;
+  color: var(--color-muted);
   font-size: 13px;
   font-weight: 600;
   text-transform: uppercase;
@@ -362,9 +375,9 @@ body {
 .setup-field input {
   width: 100%;
   min-height: 46px;
-  border: 1px solid #d8dee5;
+  border: 1px solid var(--color-border);
   border-radius: 10px;
-  color: #17212b;
+  color: var(--color-text);
   font: inherit;
   padding: 0 12px;
   outline: none;
@@ -376,7 +389,7 @@ body {
 
 .setup-field input:focus {
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+  box-shadow: 0 0 0 3px rgba(var(--color-primary-rgb), 0.18);
 }
 
 .setup-field input.has-error {
@@ -389,9 +402,9 @@ body {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   min-height: 44px;
   overflow: hidden;
-  border: 1px solid #d8dee5;
+  border: 1px solid var(--color-border);
   border-radius: 10px;
-  background: #f8fafc;
+  background: #f7efe3;
 }
 
 .setup-segmented button,
@@ -399,7 +412,7 @@ body {
   min-width: 0;
   border: 0;
   background: transparent;
-  color: #475569;
+  color: var(--color-muted);
   font: inherit;
   font-size: 13px;
   font-weight: 600;
@@ -420,7 +433,7 @@ body {
 .lineup-team-name {
   display: block;
   margin-bottom: 8px;
-  color: #17212b;
+  color: var(--color-navy);
   font-size: 14px;
   font-weight: 650;
 }
@@ -428,10 +441,10 @@ body {
 .secondary-setup-button {
   align-self: flex-end;
   min-height: 40px;
-  border: 1px solid #d8dee5;
+  border: 1px solid var(--color-border);
   border-radius: 999px;
   background: #ffffff;
-  color: var(--color-primary);
+  color: var(--color-dark-green);
   font: inherit;
   font-size: 13px;
   font-weight: 600;
@@ -454,7 +467,7 @@ body {
 
 .setup-flow-actions button {
   min-height: 42px;
-  border: 1px solid var(--color-primary);
+  border: 1px solid var(--color-dark-green);
   border-radius: 999px;
   background: var(--color-primary);
   color: #ffffff;
@@ -473,14 +486,14 @@ body {
 
 .page-section-title {
   margin: 0 0 12px;
-  color: #17212b;
+  color: var(--color-navy);
   font-size: 18px;
   font-weight: 600;
 }
 
 .game-settings-panel {
   margin-bottom: 28px;
-  border: 1px solid #d8dee5;
+  border: 1px solid var(--color-border);
   border-radius: 12px;
   background: #ffffff;
   overflow: hidden;
@@ -502,11 +515,11 @@ body {
 }
 
 .setting-section + .setting-section {
-  border-left: 1px solid #d8dee5;
+  border-left: 1px solid var(--color-border);
 }
 
 .setting-section > span {
-  color: #475569;
+  color: var(--color-muted);
   font-size: 13px;
   font-weight: 500;
 }
@@ -517,7 +530,7 @@ body {
   align-items: stretch;
   width: 92px;
   min-height: 46px;
-  border: 1px solid #d8dee5;
+  border: 1px solid var(--color-border);
   border-radius: 10px;
   overflow: hidden;
   background: #ffffff;
@@ -526,7 +539,7 @@ body {
 .innings-stepper strong {
   display: grid;
   place-items: center;
-  color: #17212b;
+  color: var(--color-navy);
   font-size: 20px;
   font-weight: 600;
 }
@@ -534,15 +547,15 @@ body {
 .stepper-buttons {
   display: grid;
   grid-template-rows: 1fr 1fr;
-  border-left: 1px solid #d8dee5;
+  border-left: 1px solid var(--color-border);
 }
 
 .stepper-buttons button {
   display: grid;
   place-items: center;
   border: 0;
-  background: #f8fafc;
-  color: #475569;
+  background: #f7efe3;
+  color: var(--color-muted);
   font: inherit;
   font-size: 11px;
   line-height: 1;
@@ -550,12 +563,12 @@ body {
 }
 
 .stepper-buttons button + button {
-  border-top: 1px solid #d8dee5;
+  border-top: 1px solid var(--color-border);
 }
 
 .stepper-buttons button:hover {
-  background: rgba(37, 99, 235, 0.08);
-  color: var(--color-primary);
+  background: rgba(var(--color-primary-rgb), 0.12);
+  color: var(--color-dark-green);
 }
 
 .segmented-control {
@@ -563,16 +576,16 @@ body {
   grid-template-columns: 1fr 1fr;
   min-height: 42px;
   overflow: hidden;
-  border: 1px solid #d8dee5;
+  border: 1px solid var(--color-border);
   border-radius: 10px;
-  background: #f8fafc;
+  background: #f7efe3;
 }
 
 .segmented-control button {
   min-width: 0;
   border: 0;
   background: transparent;
-  color: #475569;
+  color: var(--color-muted);
   font: inherit;
   font-size: 13px;
   font-weight: 500;
@@ -610,15 +623,15 @@ body {
   grid-template-columns: 72px minmax(0, 1fr);
   min-height: 58px;
   overflow: hidden;
-  border: 1px solid #d8dee5;
+  border: 1px solid var(--color-border);
   border-radius: 10px;
 }
 
 .side-chip {
   display: grid;
   place-items: center;
-  background: #f3f6fb;
-  color: #475569;
+  background: #f7efe3;
+  color: var(--color-muted);
   font-size: 12px;
   font-weight: 500;
   text-transform: uppercase;
@@ -636,7 +649,7 @@ body {
   position: absolute;
   left: 12px;
   top: 50%;
-  color: #17212b;
+  color: var(--color-text);
   font-size: 15px;
   font-weight: 500;
   line-height: 1.2;
@@ -652,7 +665,7 @@ body {
 .team-input-stack input {
   min-width: 0;
   border: 0;
-  color: #17212b;
+  color: var(--color-text);
   font: inherit;
   font-weight: 500;
   height: 100%;
@@ -669,14 +682,14 @@ body {
 .team-name-field.has-value .embedded-team-label,
 .team-name-field:focus-within .embedded-team-label {
   top: 8px;
-  color: #64748b;
+  color: var(--color-muted);
   font-size: 10px;
   transform: translateY(0);
 }
 
 .team-name-field:focus-within {
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+  box-shadow: 0 0 0 3px rgba(var(--color-primary-rgb), 0.18);
 }
 
 .team-name-field.has-error {
@@ -693,10 +706,10 @@ body {
   align-items: center;
   justify-content: space-between;
   min-height: 38px;
-  border: 1px solid #d8dee5;
+  border: 1px solid var(--color-border);
   border-radius: 10px;
   background: #ffffff;
-  color: #17212b;
+  color: var(--color-text);
   font: inherit;
   font-size: 13px;
   font-weight: 500;
@@ -705,7 +718,7 @@ body {
 }
 
 .roster-toggle span {
-  color: #64748b;
+  color: var(--color-muted);
   font-size: 12px;
   font-weight: 500;
 }
@@ -720,7 +733,7 @@ body {
 
 .roster-editor {
   overflow: hidden;
-  border: 1px solid #d8dee5;
+  border: 1px solid var(--color-border);
   border-radius: 10px;
   background: #ffffff;
 }
@@ -730,16 +743,16 @@ body {
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 10px;
   padding: 10px;
-  border-top: 1px solid #d8dee5;
-  background: #f8fafc;
+  border-top: 1px solid var(--color-border);
+  background: #f7efe3;
 }
 
 .add-player-row input {
   min-width: 0;
   min-height: 42px;
-  border: 1px solid #d8dee5;
+  border: 1px solid var(--color-border);
   border-radius: 10px;
-  color: #17212b;
+  color: var(--color-text);
   font: inherit;
   padding: 0 12px;
   outline: none;
@@ -751,12 +764,12 @@ body {
 
 .add-player-row input:focus {
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+  box-shadow: 0 0 0 3px rgba(var(--color-primary-rgb), 0.18);
 }
 
 .add-player-row button {
   min-height: 42px;
-  border: 1px solid var(--color-primary);
+  border: 1px solid var(--color-dark-green);
   border-radius: 10px;
   background: var(--color-primary);
   color: #ffffff;
@@ -776,7 +789,7 @@ body {
 .empty-roster {
   margin: 0;
   padding: 14px 12px;
-  color: #64748b;
+  color: var(--color-muted);
   font-size: 13px;
 }
 
@@ -791,12 +804,12 @@ body {
 }
 
 .player-tile + .player-tile {
-  border-top: 1px solid #e6eaee;
+  border-top: 1px solid #f0e3d1;
 }
 
 .player-tile.dragging {
   opacity: 0.5;
-  background: rgba(37, 99, 235, 0.06);
+  background: rgba(var(--color-primary-rgb), 0.1);
 }
 
 .player-order {
@@ -805,8 +818,8 @@ body {
   width: 28px;
   height: 28px;
   border-radius: 999px;
-  background: #f3f6fb;
-  color: #475569;
+  background: #f7efe3;
+  color: var(--color-muted);
   font-size: 12px;
   font-weight: 600;
 }
@@ -814,7 +827,7 @@ body {
 .player-name {
   min-width: 0;
   overflow: hidden;
-  color: #17212b;
+  color: var(--color-text);
   font-weight: 500;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -899,7 +912,7 @@ body {
 
 .begin-game-button {
   min-height: 42px;
-  border: 1px solid var(--color-primary);
+  border: 1px solid var(--color-dark-green);
   border-radius: 999px;
   background: var(--color-primary);
   color: #ffffff;
@@ -927,8 +940,8 @@ body {
   min-height: 100vh;
   overflow: hidden;
   background:
-    radial-gradient(circle at 50% 42%, rgba(98, 91, 130, 0.34), transparent 42%),
-    linear-gradient(180deg, #19192a 0%, #111221 100%);
+    radial-gradient(circle at 50% 42%, rgba(var(--color-primary-rgb), 0.24), transparent 42%),
+    linear-gradient(180deg, #001020 0%, #050914 100%);
   color: #ffffff;
   padding: 16px;
 }
@@ -938,10 +951,10 @@ body {
   grid-template-columns: 1.1fr 1fr 1fr 0.8fr;
   align-items: center;
   min-height: 94px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(224, 176, 96, 0.24);
   border-radius: 16px;
-  background: rgba(15, 16, 30, 0.72);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 24px 70px rgba(0, 0, 0, 0.24);
+  background: rgba(0, 16, 32, 0.82);
+  box-shadow: inset 0 1px 0 rgba(255, 250, 243, 0.06), 0 24px 70px rgba(0, 0, 0, 0.24);
 }
 
 .game-state,
@@ -956,33 +969,33 @@ body {
 
 .game-state {
   gap: 10px;
-  color: #e9e7f6;
+  color: var(--color-cream);
   font-size: 14px;
   text-transform: uppercase;
 }
 
 .game-state span {
-  color: #b8b5c9;
+  color: #d8c9b2;
   font-weight: 500;
 }
 
 .team-score {
   align-items: center;
-  border-left: 1px solid rgba(255, 255, 255, 0.08);
+  border-left: 1px solid rgba(224, 176, 96, 0.2);
 }
 
 .team-score span,
 .pitch-count span,
 .batter-panel span,
 .lineup-panel span {
-  color: #aaa5ff;
+  color: var(--color-gold);
   font-size: 12px;
   font-weight: 600;
   text-transform: uppercase;
 }
 
 .team-score.muted span {
-  color: #b8b5c9;
+  color: #d8c9b2;
 }
 
 .team-score strong {
@@ -997,7 +1010,7 @@ body {
   margin: 14px;
   min-height: 66px;
   border-radius: 10px;
-  background: rgba(255, 255, 255, 0.04);
+  background: rgba(224, 176, 96, 0.1);
 }
 
 .pitch-count strong {
@@ -1034,9 +1047,9 @@ body {
   min-width: 76px;
   min-height: 46px;
   overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 250, 243, 0.18);
   border-radius: 7px;
-  background: #5a54e8;
+  background: var(--color-primary);
   color: #ffffff;
   font-size: 11px;
   padding: 4px 10px;
@@ -1073,9 +1086,9 @@ body {
   position: absolute;
   bottom: 18px;
   width: 170px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(224, 176, 96, 0.2);
   border-radius: 14px;
-  background: rgba(12, 13, 25, 0.78);
+  background: rgba(0, 16, 32, 0.82);
   padding: 18px;
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.24);
 }
@@ -1103,7 +1116,7 @@ body {
 
 .batter-panel small,
 .lineup-panel small {
-  color: #b8b5c9;
+  color: #d8c9b2;
   font-size: 12px;
   text-transform: uppercase;
 }
@@ -1112,7 +1125,7 @@ body {
 .lineup-panel div {
   height: 1px;
   margin: 14px 0;
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(224, 176, 96, 0.18);
 }
 
 .score-action-bar {
@@ -1121,9 +1134,9 @@ body {
   gap: 0;
   min-height: 70px;
   overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(224, 176, 96, 0.2);
   border-radius: 14px;
-  background: rgba(15, 16, 30, 0.72);
+  background: rgba(0, 16, 32, 0.82);
 }
 
 .score-action-bar button {
@@ -1132,9 +1145,9 @@ body {
   justify-content: center;
   gap: 12px;
   border: 0;
-  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  border-right: 1px solid rgba(224, 176, 96, 0.18);
   background: transparent;
-  color: #c9c5d8;
+  color: #e8dac3;
   font: inherit;
   font-size: 12px;
   font-weight: 600;
@@ -1147,7 +1160,7 @@ body {
 }
 
 .score-action-bar button:hover {
-  background: rgba(255, 255, 255, 0.04);
+  background: rgba(224, 176, 96, 0.1);
   color: #ffffff;
 }
 
@@ -1155,7 +1168,7 @@ body {
   display: block;
   width: 24px;
   height: 24px;
-  border: 2px solid #8f88ff;
+  border: 2px solid var(--color-gold);
   transform: rotate(45deg);
 }
 
@@ -1164,7 +1177,7 @@ body {
   display: block;
   width: 18px;
   height: 18px;
-  border: 2px solid #8f88ff;
+  border: 2px solid var(--color-gold);
   content: "";
   transform: translate(7px, -7px);
 }
@@ -1179,8 +1192,8 @@ body {
 }
 
 .footer {
-  border-top: 1px solid #d8dee5;
-  background: #ffffff;
+  border-top: 1px solid var(--color-border);
+  background: var(--color-surface);
 }
 
 @media (max-width: 760px) {

@@ -17,7 +17,7 @@ export default function App() {
 
   return (
     <div className="app-shell">
-      <TopNav />
+      <TopNav onStartGame={() => setPage('game-setup')} />
       <MainArea>
         {page === 'home' && <HomePage onStartGame={() => setPage('game-setup')} />}
         {page === 'game-setup' && <GameSetupPage onBeginGame={() => setPage('score-game')} />}
