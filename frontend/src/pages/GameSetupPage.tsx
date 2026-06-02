@@ -1,68 +1,80 @@
 import { useState } from 'react'
 
-type TrackingMode = 'one' | 'both'
+type TrackingMode = 'runs' | 'one' | 'both'
 type TeamKey = 'teamOne' | 'teamTwo'
-type SetupStep = 'mode' | 'teams' | 'lineups' | 'settings'
 
 type GameSetupPageProps = {
   onBeginGame: () => void
 }
 
-const setupSteps: Array<{ id: SetupStep; label: string }> = [
-  { id: 'mode', label: 'Mode' },
-  { id: 'teams', label: 'Teams' },
-  { id: 'lineups', label: 'Lineups' },
-  { id: 'settings', label: 'Settings' },
-]
-
 export function GameSetupPage({ onBeginGame }: GameSetupPageProps) {
-  const [activeStep, setActiveStep] = useState<SetupStep>('mode')
-  const [trackingMode, setTrackingMode] = useState<TrackingMode>('one')
+  const [trackedBatting, setTrackedBatting] = useState<Record<TeamKey, boolean>>({
+    teamOne: true,
+    teamTwo: false,
+  })
   const [teamOneName, setTeamOneName] = useState('')
   const [teamTwoName, setTeamTwoName] = useState('')
   const [homeTeam, setHomeTeam] = useState<TeamKey>('teamOne')
   const [innings, setInnings] = useState(7)
-  const [activeLineupTeam, setActiveLineupTeam] = useState<TeamKey>('teamOne')
   const [teamOnePlayers, setTeamOnePlayers] = useState<string[]>([])
   const [teamTwoPlayers, setTeamTwoPlayers] = useState<string[]>([])
-  const [teamOnePlayerName, setTeamOnePlayerName] = useState('')
-  const [teamTwoPlayerName, setTeamTwoPlayerName] = useState('')
   const [draggedPlayer, setDraggedPlayer] = useState<{ team: TeamKey; index: number } | null>(null)
+  const [dropTarget, setDropTarget] = useState<{ team: TeamKey; index: number } | null>(null)
+  const [teamOneDraftPlayer, setTeamOneDraftPlayer] = useState('')
+  const [teamTwoDraftPlayer, setTeamTwoDraftPlayer] = useState('')
 
-  const teamOneLabel = teamOneName.trim() || (trackingMode === 'one' ? 'My Team' : 'Home Team')
-  const teamTwoLabel = teamTwoName.trim() || (trackingMode === 'one' ? 'Opponent' : 'Away Team')
+  const teamOneLabel = teamOneName.trim() || 'Team 1'
+  const teamTwoLabel = teamTwoName.trim() || 'Team 2'
   const hasDuplicateTeamNames = teamOneLabel.toLowerCase() === teamTwoLabel.toLowerCase()
-  const trackedTeams: TeamKey[] = trackingMode === 'both' ? ['teamOne', 'teamTwo'] : ['teamOne']
-  const visibleLineupTeam = trackingMode === 'both' ? activeLineupTeam : 'teamOne'
+  const trackedCount = Number(trackedBatting.teamOne) + Number(trackedBatting.teamTwo)
+  const trackingMode: TrackingMode = trackedCount === 0 ? 'runs' : trackedCount === 1 ? 'one' : 'both'
+  const trackedTeamLabel = trackedBatting.teamOne ? teamOneLabel : teamTwoLabel
 
-  function selectTrackingMode(mode: TrackingMode) {
-    setTrackingMode(mode)
-    if (mode === 'one') {
-      setActiveLineupTeam('teamOne')
+  function setTeamBattingTracking(team: TeamKey, shouldTrackBatting: boolean) {
+    setTrackedBatting((current) => ({
+      ...current,
+      [team]: shouldTrackBatting,
+    }))
+  }
+
+  function swapHomeTeam() {
+    setHomeTeam((current) => (current === 'teamOne' ? 'teamTwo' : 'teamOne'))
+  }
+
+  function setPlayers(team: TeamKey, updater: (players: string[]) => string[]) {
+    if (team === 'teamOne') {
+      setTeamOnePlayers(updater)
       return
     }
 
-    setHomeTeam('teamOne')
+    setTeamTwoPlayers(updater)
   }
 
   function addPlayer(team: TeamKey) {
-    const playerName = team === 'teamOne' ? teamOnePlayerName.trim() : teamTwoPlayerName.trim()
+    const playerName = team === 'teamOne' ? teamOneDraftPlayer.trim() : teamTwoDraftPlayer.trim()
     if (!playerName) {
       return
     }
 
+    setPlayers(team, (players) => [...players, playerName])
     if (team === 'teamOne') {
-      setTeamOnePlayers((players) => [...players, playerName])
-      setTeamOnePlayerName('')
+      setTeamOneDraftPlayer('')
       return
     }
 
-    setTeamTwoPlayers((players) => [...players, playerName])
-    setTeamTwoPlayerName('')
+    setTeamTwoDraftPlayer('')
+  }
+
+  function removePlayer(team: TeamKey, index: number) {
+    setPlayers(team, (players) => players.filter((_, playerIndex) => playerIndex !== index))
+  }
+
+  function updatePlayer(team: TeamKey, index: number, value: string) {
+    setPlayers(team, (players) => players.map((player, playerIndex) => (playerIndex === index ? value : player)))
   }
 
   function movePlayer(team: TeamKey, fromIndex: number, toIndex: number) {
-    const updatePlayers = (players: string[]) => {
+    setPlayers(team, (players) => {
       if (fromIndex === toIndex) {
         return players
       }
@@ -71,482 +83,297 @@ export function GameSetupPage({ onBeginGame }: GameSetupPageProps) {
       const [movedPlayer] = nextPlayers.splice(fromIndex, 1)
       nextPlayers.splice(toIndex, 0, movedPlayer)
       return nextPlayers
-    }
-
-    if (team === 'teamOne') {
-      setTeamOnePlayers(updatePlayers)
-      return
-    }
-
-    setTeamTwoPlayers(updatePlayers)
+    })
   }
 
-  function handlePlayerDragOver(team: TeamKey, index: number) {
-    if (draggedPlayer?.team !== team || draggedPlayer.index === index) {
+  function dropPlayer(team: TeamKey, index: number) {
+    if (draggedPlayer?.team !== team) {
+      setDropTarget(null)
       return
     }
 
     movePlayer(team, draggedPlayer.index, index)
-    setDraggedPlayer({ team, index })
-  }
-
-  function removePlayer(team: TeamKey, index: number) {
-    const updatePlayers = (players: string[]) => players.filter((_, playerIndex) => playerIndex !== index)
-
-    if (team === 'teamOne') {
-      setTeamOnePlayers(updatePlayers)
-      return
-    }
-
-    setTeamTwoPlayers(updatePlayers)
-  }
-
-  function nextStep() {
-    const currentIndex = setupSteps.findIndex((step) => step.id === activeStep)
-    const next = setupSteps[currentIndex + 1]
-    if (next) {
-      setActiveStep(next.id)
-    }
+    setDraggedPlayer(null)
+    setDropTarget(null)
   }
 
   return (
-    <section className="setup-flow-page" aria-label="New game setup">
-      <div className="setup-flow-header">
-        <div>
-          <span>New Game</span>
-          <h1>{stepTitle(activeStep, trackingMode, visibleLineupTeam, teamOneLabel, teamTwoLabel)}</h1>
-        </div>
-        <nav className="setup-step-nav" aria-label="Game setup sections">
-          {setupSteps.map((step) => (
-            <button
-              className={activeStep === step.id ? 'active' : ''}
-              key={step.id}
-              type="button"
-              onClick={() => setActiveStep(step.id)}
-            >
-              {step.label}
-            </button>
-          ))}
-        </nav>
+    <section className="create-game-page" aria-label="Create a new game">
+      <div className="create-game-header">
+        <span>New Game</span>
+        <h1>Create a game</h1>
+        <p>Choose how detailed your scorekeeping should be, then add teams and lineups if needed.</p>
       </div>
 
-      <div className="setup-flow-card">
-        {activeStep === 'mode' && (
-          <SetupModeStep trackingMode={trackingMode} onSelect={selectTrackingMode} />
-        )}
+      <div className="create-game-stack">
+        <section className="create-game-card teams-setup-card" aria-labelledby="game-info-title">
+            <div className="create-card-heading teams-card-heading">
+              <div>
+              <h2 id="game-info-title">Teams</h2>
+              <p>
+                {trackingMode === 'runs'
+                  ? 'Name each team. No batting orders are needed for runs-only scoring.'
+                  : trackingMode === 'one'
+                    ? `Add ${trackedTeamLabel}'s batting order. The other team's runs can be entered without managing their lineup.`
+                    : 'Name each team and add both batting orders.'}
+              </p>
+              </div>
+              <div className="teams-innings-control">
+                <span># of Innings</span>
+                <div className="innings-stepper" aria-label="Number of innings">
+                  <strong>{innings}</strong>
+                  <div className="stepper-buttons">
+                    <button type="button" aria-label="Increase innings" onClick={() => setInnings((current) => Math.min(20, current + 1))}>
+                      ^
+                    </button>
+                    <button type="button" aria-label="Decrease innings" onClick={() => setInnings((current) => Math.max(1, current - 1))}>
+                      v
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
 
-        {activeStep === 'teams' && (
-          <TeamSetupStep
-            hasDuplicateTeamNames={hasDuplicateTeamNames}
-            homeTeam={homeTeam}
-            setHomeTeam={setHomeTeam}
-            setTeamOneName={setTeamOneName}
-            setTeamTwoName={setTeamTwoName}
-            teamOneName={teamOneName}
-            teamTwoName={teamTwoName}
-            trackingMode={trackingMode}
-          />
-        )}
+            <div className="team-card-grid">
+              <div className="team-column">
+                <TeamTrackingSwitch
+                  label={teamOneLabel}
+                  onChange={(shouldTrackBatting) => setTeamBattingTracking('teamOne', shouldTrackBatting)}
+                  trackBatting={trackedBatting.teamOne}
+                />
+                <TeamSetupCard
+                  draggedPlayer={draggedPlayer}
+                  dropTarget={dropTarget}
+                  draftPlayerName={teamOneDraftPlayer}
+                  hasDuplicateTeamNames={hasDuplicateTeamNames}
+                  isHome={homeTeam === 'teamOne'}
+                  name={teamOneName}
+                  onMakeHome={swapHomeTeam}
+                  onNameChange={setTeamOneName}
+                  onDragEnd={() => {
+                    setDraggedPlayer(null)
+                    setDropTarget(null)
+                  }}
+                  onDragOver={(index) => setDropTarget({ team: 'teamOne', index })}
+                  onDragStart={(index) => setDraggedPlayer({ team: 'teamOne', index })}
+                  onDrop={(index) => dropPlayer('teamOne', index)}
+                  onDraftPlayerNameChange={setTeamOneDraftPlayer}
+                  onRemovePlayer={(index) => removePlayer('teamOne', index)}
+                  onSubmitPlayer={() => addPlayer('teamOne')}
+                  onUpdatePlayer={(index, value) => updatePlayer('teamOne', index, value)}
+                  players={teamOnePlayers}
+                  placeholder="Team 1"
+                  showHomeToggle
+                  trackBatting={trackedBatting.teamOne}
+                  team="teamOne"
+                />
+              </div>
 
-        {activeStep === 'lineups' && (
-          <LineupStep
-            activeLineupTeam={visibleLineupTeam}
-            addPlayer={addPlayer}
-            draggedPlayer={draggedPlayer}
-            onDragEnd={() => setDraggedPlayer(null)}
-            onDragOver={handlePlayerDragOver}
-            onDragStart={(team, index) => setDraggedPlayer({ team, index })}
-            onRemovePlayer={removePlayer}
-            setActiveLineupTeam={setActiveLineupTeam}
-            setTeamOnePlayerName={setTeamOnePlayerName}
-            setTeamTwoPlayerName={setTeamTwoPlayerName}
-            teamOneLabel={teamOneLabel}
-            teamOnePlayerName={teamOnePlayerName}
-            teamOnePlayers={teamOnePlayers}
-            teamTwoLabel={teamTwoLabel}
-            teamTwoPlayerName={teamTwoPlayerName}
-            teamTwoPlayers={teamTwoPlayers}
-            trackedTeams={trackedTeams}
-            trackingMode={trackingMode}
-          />
-        )}
-
-        {activeStep === 'settings' && (
-          <SettingsStep innings={innings} setInnings={setInnings} />
-        )}
+              <div className="team-column">
+                <TeamTrackingSwitch
+                  label={teamTwoLabel}
+                  onChange={(shouldTrackBatting) => setTeamBattingTracking('teamTwo', shouldTrackBatting)}
+                  trackBatting={trackedBatting.teamTwo}
+                />
+                <TeamSetupCard
+                  draggedPlayer={draggedPlayer}
+                  dropTarget={dropTarget}
+                  draftPlayerName={teamTwoDraftPlayer}
+                  hasDuplicateTeamNames={hasDuplicateTeamNames}
+                  isHome={homeTeam === 'teamTwo'}
+                  name={teamTwoName}
+                  onMakeHome={swapHomeTeam}
+                  onNameChange={setTeamTwoName}
+                  onDragEnd={() => {
+                    setDraggedPlayer(null)
+                    setDropTarget(null)
+                  }}
+                  onDragOver={(index) => setDropTarget({ team: 'teamTwo', index })}
+                  onDragStart={(index) => setDraggedPlayer({ team: 'teamTwo', index })}
+                  onDrop={(index) => dropPlayer('teamTwo', index)}
+                  onDraftPlayerNameChange={setTeamTwoDraftPlayer}
+                  onRemovePlayer={(index) => removePlayer('teamTwo', index)}
+                  onSubmitPlayer={() => addPlayer('teamTwo')}
+                  onUpdatePlayer={(index, value) => updatePlayer('teamTwo', index, value)}
+                  players={teamTwoPlayers}
+                  placeholder="Team 2"
+                  showHomeToggle
+                  trackBatting={trackedBatting.teamTwo}
+                  team="teamTwo"
+                />
+              </div>
+            </div>
+          </section>
       </div>
 
-      {hasDuplicateTeamNames && (
-        <p className="setup-error">Team names must be different.</p>
-      )}
+      {hasDuplicateTeamNames && <p className="setup-error">Team names must be different.</p>}
 
-      <div className="setup-flow-actions">
-        {activeStep !== 'settings' ? (
-          <button type="button" onClick={nextStep} disabled={hasDuplicateTeamNames}>
-            Continue
-          </button>
-        ) : (
-          <button type="button" onClick={onBeginGame} disabled={hasDuplicateTeamNames}>
-            Start Game
-          </button>
-        )}
+      <div className="create-game-actions">
+        <button type="button" onClick={onBeginGame} disabled={hasDuplicateTeamNames}>
+          Start Game
+        </button>
       </div>
+
     </section>
   )
 }
 
-type SetupModeStepProps = {
-  trackingMode: TrackingMode
-  onSelect: (mode: TrackingMode) => void
-}
-
-function SetupModeStep({ trackingMode, onSelect }: SetupModeStepProps) {
-  return (
-    <div className="setup-step-content">
-      <div className="setup-option-grid">
-        <button
-          className={trackingMode === 'one' ? 'setup-option active' : 'setup-option'}
-          type="button"
-          onClick={() => onSelect('one')}
-        >
-          <strong>My Team Only</strong>
-          <span>Track your lineup and enter opponent runs by inning.</span>
-        </button>
-        <button
-          className={trackingMode === 'both' ? 'setup-option active' : 'setup-option'}
-          type="button"
-          onClick={() => onSelect('both')}
-        >
-          <strong>Both Teams</strong>
-          <span>Score both batting orders like the official scorekeeper.</span>
-        </button>
-      </div>
-    </div>
-  )
-}
-
-type TeamSetupStepProps = {
+type TeamSetupCardProps = {
+  draggedPlayer: { team: TeamKey; index: number } | null
+  draftPlayerName: string
+  dropTarget: { team: TeamKey; index: number } | null
   hasDuplicateTeamNames: boolean
-  homeTeam: TeamKey
-  setHomeTeam: (team: TeamKey) => void
-  setTeamOneName: (name: string) => void
-  setTeamTwoName: (name: string) => void
-  teamOneName: string
-  teamTwoName: string
-  trackingMode: TrackingMode
-}
-
-function TeamSetupStep({
-  hasDuplicateTeamNames,
-  homeTeam,
-  setHomeTeam,
-  setTeamOneName,
-  setTeamTwoName,
-  teamOneName,
-  teamTwoName,
-  trackingMode,
-}: TeamSetupStepProps) {
-  if (trackingMode === 'both') {
-    return (
-      <div className="setup-form-stack">
-        <SetupTextField
-          hasError={hasDuplicateTeamNames}
-          label="Home Team"
-          onChange={setTeamOneName}
-          placeholder="Thunder"
-          value={teamOneName}
-        />
-        <SetupTextField
-          hasError={hasDuplicateTeamNames}
-          label="Away Team"
-          onChange={setTeamTwoName}
-          placeholder="Wildcats"
-          value={teamTwoName}
-        />
-      </div>
-    )
-  }
-
-  return (
-    <div className="setup-form-stack">
-      <SetupTextField
-        hasError={hasDuplicateTeamNames}
-        label="Team Name"
-        onChange={setTeamOneName}
-        placeholder="Thunder"
-        value={teamOneName}
-      />
-      <SetupTextField
-        hasError={hasDuplicateTeamNames}
-        label="Opponent"
-        onChange={setTeamTwoName}
-        placeholder="Wildcats"
-        value={teamTwoName}
-      />
-      <div className="setup-field">
-        <span>You Are</span>
-        <div className="setup-segmented">
-          <button
-            className={homeTeam === 'teamOne' ? 'active' : ''}
-            type="button"
-            onClick={() => setHomeTeam('teamOne')}
-          >
-            Home
-          </button>
-          <button
-            className={homeTeam === 'teamTwo' ? 'active' : ''}
-            type="button"
-            onClick={() => setHomeTeam('teamTwo')}
-          >
-            Away
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-type SetupTextFieldProps = {
-  hasError: boolean
-  label: string
-  onChange: (value: string) => void
-  placeholder: string
-  value: string
-}
-
-function SetupTextField({ hasError, label, onChange, placeholder, value }: SetupTextFieldProps) {
-  return (
-    <label className="setup-field">
-      <span>{label}</span>
-      <input
-        className={hasError ? 'has-error' : ''}
-        value={value}
-        onBlur={() => onChange(value.trim())}
-        onChange={(event) => onChange(event.target.value)}
-        placeholder={placeholder}
-      />
-    </label>
-  )
-}
-
-type LineupStepProps = {
-  activeLineupTeam: TeamKey
-  addPlayer: (team: TeamKey) => void
-  draggedPlayer: { team: TeamKey; index: number } | null
-  onDragEnd: () => void
-  onDragOver: (team: TeamKey, index: number) => void
-  onDragStart: (team: TeamKey, index: number) => void
-  onRemovePlayer: (team: TeamKey, index: number) => void
-  setActiveLineupTeam: (team: TeamKey) => void
-  setTeamOnePlayerName: (name: string) => void
-  setTeamTwoPlayerName: (name: string) => void
-  teamOneLabel: string
-  teamOnePlayerName: string
-  teamOnePlayers: string[]
-  teamTwoLabel: string
-  teamTwoPlayerName: string
-  teamTwoPlayers: string[]
-  trackedTeams: TeamKey[]
-  trackingMode: TrackingMode
-}
-
-function LineupStep({
-  activeLineupTeam,
-  addPlayer,
-  draggedPlayer,
-  onDragEnd,
-  onDragOver,
-  onDragStart,
-  onRemovePlayer,
-  setActiveLineupTeam,
-  setTeamOnePlayerName,
-  setTeamTwoPlayerName,
-  teamOneLabel,
-  teamOnePlayerName,
-  teamOnePlayers,
-  teamTwoLabel,
-  teamTwoPlayerName,
-  teamTwoPlayers,
-  trackedTeams,
-  trackingMode,
-}: LineupStepProps) {
-  const isTeamOneActive = activeLineupTeam === 'teamOne'
-
-  return (
-    <div className="setup-form-stack">
-      {trackingMode === 'both' && (
-        <div className="lineup-switch">
-          <button
-            className={activeLineupTeam === 'teamOne' ? 'active' : ''}
-            type="button"
-            onClick={() => setActiveLineupTeam('teamOne')}
-          >
-            Home Team
-          </button>
-          <button
-            className={activeLineupTeam === 'teamTwo' ? 'active' : ''}
-            type="button"
-            onClick={() => setActiveLineupTeam('teamTwo')}
-          >
-            Away Team
-          </button>
-        </div>
-      )}
-
-      <div>
-        <span className="lineup-team-name">{isTeamOneActive ? teamOneLabel : teamTwoLabel}</span>
-        <RosterEditor
-          addPlayer={() => addPlayer(activeLineupTeam)}
-          draggedPlayer={draggedPlayer}
-          inputValue={isTeamOneActive ? teamOnePlayerName : teamTwoPlayerName}
-          onDragEnd={onDragEnd}
-          onDragOver={(index) => onDragOver(activeLineupTeam, index)}
-          onDragStart={(index) => onDragStart(activeLineupTeam, index)}
-          onDrop={(index) => {
-            if (draggedPlayer?.team === activeLineupTeam) {
-              onDragOver(activeLineupTeam, index)
-            }
-          }}
-          onInputChange={isTeamOneActive ? setTeamOnePlayerName : setTeamTwoPlayerName}
-          onRemovePlayer={(index) => onRemovePlayer(activeLineupTeam, index)}
-          players={isTeamOneActive ? teamOnePlayers : teamTwoPlayers}
-          team={activeLineupTeam}
-        />
-      </div>
-
-      {trackingMode === 'both' && trackedTeams.includes('teamTwo') && activeLineupTeam === 'teamOne' && (
-        <button className="secondary-setup-button" type="button" onClick={() => setActiveLineupTeam('teamTwo')}>
-          Next Lineup
-        </button>
-      )}
-    </div>
-  )
-}
-
-type SettingsStepProps = {
-  innings: number
-  setInnings: (updater: (current: number) => number) => void
-}
-
-function SettingsStep({ innings, setInnings }: SettingsStepProps) {
-  return (
-    <div className="setup-form-stack">
-      <div className="setup-field">
-        <span>Innings</span>
-        <div className="innings-stepper" aria-label="Number of innings">
-          <strong>{innings}</strong>
-          <div className="stepper-buttons">
-            <button type="button" aria-label="Increase innings" onClick={() => setInnings((current) => Math.min(20, current + 1))}>
-              ^
-            </button>
-            <button type="button" aria-label="Decrease innings" onClick={() => setInnings((current) => Math.max(1, current - 1))}>
-              v
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function stepTitle(
-  step: SetupStep,
-  trackingMode: TrackingMode,
-  activeLineupTeam: TeamKey,
-  teamOneLabel: string,
-  teamTwoLabel: string,
-) {
-  if (step === 'mode') {
-    return 'Tracking Mode'
-  }
-
-  if (step === 'teams') {
-    return trackingMode === 'one' ? 'My Team Setup' : 'Team Setup'
-  }
-
-  if (step === 'lineups') {
-    if (trackingMode === 'one') {
-      return `${teamOneLabel} Lineup`
-    }
-
-    return activeLineupTeam === 'teamOne' ? 'Home Team Lineup' : 'Away Team Lineup'
-  }
-
-  return 'Game Settings'
-}
-
-type RosterEditorProps = {
-  addPlayer: () => void
-  draggedPlayer: { team: TeamKey; index: number } | null
-  inputValue: string
+  isHome: boolean
+  name: string
+  onDraftPlayerNameChange: (name: string) => void
   onDragEnd: () => void
   onDragOver: (index: number) => void
   onDragStart: (index: number) => void
   onDrop: (index: number) => void
-  onInputChange: (value: string) => void
+  onMakeHome: () => void
+  onNameChange: (name: string) => void
   onRemovePlayer: (index: number) => void
+  onSubmitPlayer: () => void
+  onUpdatePlayer: (index: number, value: string) => void
+  placeholder: string
   players: string[]
+  showHomeToggle: boolean
+  trackBatting: boolean
   team: TeamKey
 }
 
-function RosterEditor({
-  addPlayer,
+function TeamSetupCard({
   draggedPlayer,
-  inputValue,
+  draftPlayerName,
+  dropTarget,
+  hasDuplicateTeamNames,
+  isHome,
+  name,
+  onDraftPlayerNameChange,
   onDragEnd,
   onDragOver,
   onDragStart,
   onDrop,
-  onInputChange,
+  onMakeHome,
+  onNameChange,
   onRemovePlayer,
+  onSubmitPlayer,
+  onUpdatePlayer,
+  placeholder,
   players,
+  showHomeToggle,
+  trackBatting,
   team,
-}: RosterEditorProps) {
-  return (
-    <div className="roster-editor">
-      <div className="player-tile-list" aria-label="Batting order">
-        {players.length === 0 && <p className="empty-roster">No players added yet.</p>}
-        {players.map((player, index) => (
-          <div
-            className={draggedPlayer?.team === team && draggedPlayer.index === index ? 'player-tile dragging' : 'player-tile'}
-            key={`${player}-${index}`}
-            onDragEnd={onDragEnd}
-            onDragOver={(event) => {
-              event.preventDefault()
-              onDragOver(index)
-            }}
-            onDrop={() => onDrop(index)}
-          >
-            <span className="player-order">{index + 1}</span>
-            <span className="player-name">{player}</span>
-            <button className="remove-player-button" type="button" aria-label={`Remove ${player}`} onClick={() => onRemovePlayer(index)}>
-              <span aria-hidden="true" />
-            </button>
-            <span
-              className="drag-handle"
-              draggable
-              role="button"
-              aria-label={`Drag ${player}`}
-              onDragStart={() => onDragStart(index)}
-            />
-          </div>
-        ))}
-      </div>
+}: TeamSetupCardProps) {
+  const displayName = name.trim() || placeholder
 
-      <form
-        className="add-player-row"
-        onSubmit={(event) => {
-          event.preventDefault()
-          addPlayer()
-        }}
-      >
+  return (
+    <div className="team-setup-card has-lineup">
+      <div className="team-setup-heading">
         <input
-          value={inputValue}
-          onChange={(event) => onInputChange(event.target.value)}
-          placeholder="Add player"
+          className={hasDuplicateTeamNames ? 'team-heading-input has-error' : 'team-heading-input'}
+          aria-label={`${placeholder} name`}
+          value={name}
+          onBlur={() => onNameChange(name.trim())}
+          onChange={(event) => onNameChange(event.target.value)}
+          placeholder={placeholder}
         />
-        <button type="submit">Add</button>
-      </form>
+        <div className="team-card-controls">
+          {showHomeToggle ? (
+            <button className={isHome ? 'home-status active' : 'home-status'} type="button" onClick={onMakeHome}>
+              <span>{isHome ? 'Home' : 'Away'}</span>
+              <svg className="home-swap-icon" viewBox="0 0 16 16" aria-hidden="true">
+                <path d="M4.5 4.25h7m0 0-2-2m2 2-2 2M11.5 11.75h-7m0 0 2 2m-2-2 2-2" />
+              </svg>
+            </button>
+          ) : (
+            <span className="home-status readonly">{team === 'teamOne' ? 'Home' : 'Away'}</span>
+          )}
+        </div>
+      </div>
+      <div className={trackBatting ? 'player-tile-list compact' : 'player-tile-list compact disabled'} aria-label={`${displayName} batting order`}>
+        {trackBatting ? (
+          <>
+            {players.length === 0 && <p className="empty-roster">No players added yet.</p>}
+            {players.map((player, index) => (
+              <div
+                className={[
+                  'player-tile',
+                  draggedPlayer?.team === team && draggedPlayer.index === index ? 'dragging' : '',
+                  dropTarget?.team === team && dropTarget.index === index ? 'drop-target' : '',
+                ].filter(Boolean).join(' ')}
+                key={`${player}-${index}`}
+                onDragEnd={onDragEnd}
+                onDragOver={(event) => {
+                  event.preventDefault()
+                  onDragOver(index)
+                }}
+                onDrop={() => onDrop(index)}
+              >
+                <span
+                  className="drag-handle"
+                  draggable
+                  role="button"
+                  aria-label={`Drag ${player || `player ${index + 1}`}`}
+                  onDragStart={() => onDragStart(index)}
+                />
+                <span className="player-order">{index + 1}</span>
+                <input
+                  className="player-name-input"
+                  aria-label={`Player ${index + 1} name`}
+                  value={player}
+                  onChange={(event) => onUpdatePlayer(index, event.target.value)}
+                />
+                <button className="remove-player-button" type="button" aria-label={`Remove ${player}`} onClick={() => onRemovePlayer(index)}>
+                  <span aria-hidden="true" />
+                </button>
+              </div>
+            ))}
+            <form
+              className="inline-player-row"
+              onSubmit={(event) => {
+                event.preventDefault()
+                onSubmitPlayer()
+              }}
+            >
+              <span className="draft-drag-placeholder" aria-hidden="true" />
+              <span className="player-order draft">{players.length + 1}</span>
+              <input
+                placeholder="Player name"
+                value={draftPlayerName}
+                onBlur={onSubmitPlayer}
+                onChange={(event) => onDraftPlayerNameChange(event.target.value)}
+              />
+              <span className="draft-action-placeholder" aria-hidden="true" />
+            </form>
+          </>
+        ) : (
+          <div className="lineup-disabled-message">
+            Batting order not tracked. Runs will be entered as they score.
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+type TeamTrackingSwitchProps = {
+  label: string
+  onChange: (shouldTrackBatting: boolean) => void
+  trackBatting: boolean
+}
+
+function TeamTrackingSwitch({ label, onChange, trackBatting }: TeamTrackingSwitchProps) {
+  return (
+    <div className="team-tracking-row">
+      <div className="team-track-switch" aria-label={`${label} batting tracking`}>
+        <button className={trackBatting ? 'active' : ''} type="button" onClick={() => onChange(true)}>
+          Track Batting
+        </button>
+        <button className={!trackBatting ? 'active' : ''} type="button" onClick={() => onChange(false)}>
+          Runs Only
+        </button>
+      </div>
     </div>
   )
 }
