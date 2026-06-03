@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { MainArea } from './components/MainArea'
 import { TopNav } from './components/TopNav'
-import { GameSetupPage } from './pages/GameSetupPage'
+import { GameSetupPage, type GameConfig } from './pages/GameSetupPage'
 import { HomePage } from './pages/HomePage'
 import { ScoreGamePage } from './pages/ScoreGamePage'
 
@@ -10,13 +10,18 @@ type Page = 'home' | 'game-setup' | 'score-game'
 export default function App() {
   const [page, setPage] = useState<Page>('home')
   const [isWaitlistOpen, setIsWaitlistOpen] = useState(false)
+  const [gameConfig, setGameConfig] = useState<GameConfig>({
+    teamOneName: 'Team 1',
+    teamTwoName: 'Team 2',
+  })
 
-  if (page === 'score-game') {
-    return <ScoreGamePage />
+  function beginGame(config: GameConfig) {
+    setGameConfig(config)
+    setPage('score-game')
   }
 
   return (
-    <div className="app-shell">
+    <div className={page === 'score-game' ? 'app-shell score-app-shell' : 'app-shell'}>
       <TopNav
         onHome={() => setPage('home')}
         onJoinWaitlist={() => setIsWaitlistOpen(true)}
@@ -25,7 +30,8 @@ export default function App() {
       />
       <MainArea>
         {page === 'home' && <HomePage />}
-        {page === 'game-setup' && <GameSetupPage onBeginGame={() => setPage('score-game')} />}
+        {page === 'game-setup' && <GameSetupPage onBeginGame={beginGame} />}
+        {page === 'score-game' && <ScoreGamePage gameConfig={gameConfig} />}
       </MainArea>
       {isWaitlistOpen && <WaitlistModal onClose={() => setIsWaitlistOpen(false)} />}
     </div>

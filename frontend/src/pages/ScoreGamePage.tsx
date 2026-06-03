@@ -1,83 +1,34 @@
-import { BaseballField } from '../components/BaseballField'
+import { Scoreboard } from '../components/Scoreboard'
+import type { GameConfig } from './GameSetupPage'
 
-export function ScoreGamePage() {
+type ScoreGamePageProps = {
+  gameConfig: GameConfig
+}
+
+export function ScoreGamePage({ gameConfig }: ScoreGamePageProps) {
   return (
     <section className="score-game-page" aria-label="Score game">
-      <ScoreHeader />
-
-      <div className="score-game-stage">
-        <BaseballField />
-        <BatterPanel />
-        <LineupPanel />
-      </div>
-
-      <ActionBar />
+      <Scoreboard
+        awayTeamName={gameConfig.teamTwoName}
+        homeTeamName={gameConfig.teamOneName}
+        inningLabel="Top 1st"
+        outs={0}
+      />
+      <BaseOccupancy />
     </section>
   )
 }
 
-function ScoreHeader() {
-  return (
-    <header className="score-header">
-      <div className="game-state">
-        <strong>Top 3rd</strong>
-        <span>1 Out</span>
-        <span>0-1</span>
-      </div>
-      <div className="team-score">
-        <span>Thunder</span>
-        <strong>2</strong>
-      </div>
-      <div className="team-score muted">
-        <span>Wildcats</span>
-        <strong>1</strong>
-      </div>
-      <div className="pitch-count">
-        <span>Pitch Count</span>
-        <strong>24</strong>
-      </div>
-    </header>
-  )
-}
-
-function BatterPanel() {
-  return (
-    <aside className="batter-panel">
-      <span>Batting</span>
-      <strong>Jake T.</strong>
-      <small>#24 | LF</small>
-      <div />
-      <strong>0 - 1</strong>
-      <small>Strikeout in 1st</small>
-    </aside>
-  )
-}
-
-function LineupPanel() {
-  return (
-    <aside className="lineup-panel">
-      <span>On Deck</span>
-      <strong>Steve L.</strong>
-      <small>#8 | 3B</small>
-      <div />
-      <span>In The Hole</span>
-      <strong>Mike B.</strong>
-      <small>#2 | CF</small>
-    </aside>
-  )
-}
-
-function ActionBar() {
-  const actions = ['Single', 'Double', 'Triple', 'Home Run', 'Out']
+function BaseOccupancy() {
+  const bases = ['3B', '2B', '1B']
 
   return (
-    <nav className="score-action-bar" aria-label="Scoring actions">
-      {actions.map((action) => (
-        <button type="button" key={action}>
-          <span className={`action-icon action-icon-${action.toLowerCase().replaceAll(' ', '-')}`} />
-          {action}
-        </button>
+    <section className="base-occupancy-card" aria-label="Base runners">
+      {bases.map((base) => (
+        <div className={`base-slot base-slot-${base.toLowerCase()}`} key={base}>
+          <span>{base}</span>
+        </div>
       ))}
-    </nav>
+    </section>
   )
 }

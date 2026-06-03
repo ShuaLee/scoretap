@@ -2,8 +2,13 @@ import { useState } from 'react'
 
 type TeamKey = 'teamOne' | 'teamTwo'
 
+export type GameConfig = {
+  teamOneName: string
+  teamTwoName: string
+}
+
 type GameSetupPageProps = {
-  onBeginGame: () => void
+  onBeginGame: (config: GameConfig) => void
 }
 
 const TEAM_NAME_MAX_LENGTH = 45
@@ -24,10 +29,40 @@ export function GameSetupPage({ onBeginGame }: GameSetupPageProps) {
   const [dropTarget, setDropTarget] = useState<{ team: TeamKey; index: number } | null>(null)
   const [teamOneDraftPlayer, setTeamOneDraftPlayer] = useState('')
   const [teamTwoDraftPlayer, setTeamTwoDraftPlayer] = useState('')
+  const [showMissingLineupNotice, setShowMissingLineupNotice] = useState(false)
 
   const teamOneLabel = teamOneName.trim() || 'Team 1'
   const teamTwoLabel = teamTwoName.trim() || 'Team 2'
   const hasDuplicateTeamNames = teamOneLabel.toLowerCase() === teamTwoLabel.toLowerCase()
+  const teamOneHasLineup = teamOnePlayers.some((player) => player.trim()) || Boolean(teamOneDraftPlayer.trim())
+  const teamTwoHasLineup = teamTwoPlayers.some((player) => player.trim()) || Boolean(teamTwoDraftPlayer.trim())
+  const missingTrackedLineups =
+    (trackedBatting.teamOne && !teamOneHasLineup) || (trackedBatting.teamTwo && !teamTwoHasLineup)
+  const cannotStartGame = hasDuplicateTeamNames
+
+  function handleBeginGame() {
+    if (missingTrackedLineups) {
+      setShowMissingLineupNotice(true)
+      return
+    }
+
+    setTeamOnePlayers((players) => {
+      const nextPlayers = players.map((player) => player.trim()).filter(Boolean)
+      const draftPlayer = teamOneDraftPlayer.trim()
+      return draftPlayer ? [...nextPlayers, draftPlayer] : nextPlayers
+    })
+    setTeamTwoPlayers((players) => {
+      const nextPlayers = players.map((player) => player.trim()).filter(Boolean)
+      const draftPlayer = teamTwoDraftPlayer.trim()
+      return draftPlayer ? [...nextPlayers, draftPlayer] : nextPlayers
+    })
+    setTeamOneDraftPlayer('')
+    setTeamTwoDraftPlayer('')
+    onBeginGame({
+      teamOneName: teamOneLabel,
+      teamTwoName: teamTwoLabel,
+    })
+  }
 
   function setTeamBattingTracking(team: TeamKey, shouldTrackBatting: boolean) {
     setTrackedBatting((current) => ({
@@ -102,7 +137,6 @@ export function GameSetupPage({ onBeginGame }: GameSetupPageProps) {
       <div className="create-game-header">
         <span>New Game</span>
         <h1>Create a game</h1>
-        <p>Choose how detailed your scorekeeping should be, then add teams and lineups if needed.</p>
       </div>
 
       <div className="create-game-stack">
@@ -170,6 +204,9 @@ export function GameSetupPage({ onBeginGame }: GameSetupPageProps) {
       </div>
 
       {hasDuplicateTeamNames && <p className="setup-error">Team names must be different.</p>}
+      {showMissingLineupNotice && missingTrackedLineups && (
+        <p className="setup-notice">Add at least one player for each team set to At-Bats & Runs.</p>
+      )}
 
       <div className="create-game-actions">
         <div className="floating-innings-control">
@@ -211,7 +248,7 @@ export function GameSetupPage({ onBeginGame }: GameSetupPageProps) {
             </button>
           </div>
         </div>
-        <button type="button" onClick={onBeginGame} disabled={hasDuplicateTeamNames}>
+        <button type="button" onClick={handleBeginGame} disabled={cannotStartGame}>
           Start Game
         </button>
       </div>
