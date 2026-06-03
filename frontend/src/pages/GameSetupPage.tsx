@@ -1,11 +1,13 @@
 import { useState } from 'react'
 
-type TrackingMode = 'runs' | 'one' | 'both'
 type TeamKey = 'teamOne' | 'teamTwo'
 
 type GameSetupPageProps = {
   onBeginGame: () => void
 }
+
+const TEAM_NAME_MAX_LENGTH = 45
+const PLAYER_NAME_MAX_LENGTH = 24
 
 export function GameSetupPage({ onBeginGame }: GameSetupPageProps) {
   const [trackedBatting, setTrackedBatting] = useState<Record<TeamKey, boolean>>({
@@ -26,9 +28,6 @@ export function GameSetupPage({ onBeginGame }: GameSetupPageProps) {
   const teamOneLabel = teamOneName.trim() || 'Team 1'
   const teamTwoLabel = teamTwoName.trim() || 'Team 2'
   const hasDuplicateTeamNames = teamOneLabel.toLowerCase() === teamTwoLabel.toLowerCase()
-  const trackedCount = Number(trackedBatting.teamOne) + Number(trackedBatting.teamTwo)
-  const trackingMode: TrackingMode = trackedCount === 0 ? 'runs' : trackedCount === 1 ? 'one' : 'both'
-  const trackedTeamLabel = trackedBatting.teamOne ? teamOneLabel : teamTwoLabel
 
   function setTeamBattingTracking(team: TeamKey, shouldTrackBatting: boolean) {
     setTrackedBatting((current) => ({
@@ -80,8 +79,9 @@ export function GameSetupPage({ onBeginGame }: GameSetupPageProps) {
       }
 
       const nextPlayers = [...players]
-      const [movedPlayer] = nextPlayers.splice(fromIndex, 1)
-      nextPlayers.splice(toIndex, 0, movedPlayer)
+      const targetPlayer = nextPlayers[toIndex]
+      nextPlayers[toIndex] = nextPlayers[fromIndex]
+      nextPlayers[fromIndex] = targetPlayer
       return nextPlayers
     })
   }
@@ -106,109 +106,111 @@ export function GameSetupPage({ onBeginGame }: GameSetupPageProps) {
       </div>
 
       <div className="create-game-stack">
-        <section className="create-game-card teams-setup-card" aria-labelledby="game-info-title">
-            <div className="create-card-heading teams-card-heading">
-              <div>
-              <h2 id="game-info-title">Teams</h2>
-              <p>
-                {trackingMode === 'runs'
-                  ? 'Name each team. No batting orders are needed for runs-only scoring.'
-                  : trackingMode === 'one'
-                    ? `Add ${trackedTeamLabel}'s batting order. The other team's runs can be entered without managing their lineup.`
-                    : 'Name each team and add both batting orders.'}
-              </p>
-              </div>
-              <div className="teams-innings-control">
-                <span># of Innings</span>
-                <div className="innings-stepper" aria-label="Number of innings">
-                  <strong>{innings}</strong>
-                  <div className="stepper-buttons">
-                    <button type="button" aria-label="Increase innings" onClick={() => setInnings((current) => Math.min(20, current + 1))}>
-                      ^
-                    </button>
-                    <button type="button" aria-label="Decrease innings" onClick={() => setInnings((current) => Math.max(1, current - 1))}>
-                      v
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
+        <div className="team-card-grid">
+          <div className="team-column">
+            <TeamSetupCard
+              draggedPlayer={draggedPlayer}
+              dropTarget={dropTarget}
+              draftPlayerName={teamOneDraftPlayer}
+              hasDuplicateTeamNames={hasDuplicateTeamNames}
+              isHome={homeTeam === 'teamOne'}
+              name={teamOneName}
+              onBattingTrackingChange={(shouldTrackBatting) => setTeamBattingTracking('teamOne', shouldTrackBatting)}
+              onMakeHome={swapHomeTeam}
+              onNameChange={setTeamOneName}
+              onDragEnd={() => {
+                setDraggedPlayer(null)
+                setDropTarget(null)
+              }}
+              onDragOver={(index) => setDropTarget({ team: 'teamOne', index })}
+              onDragStart={(index) => setDraggedPlayer({ team: 'teamOne', index })}
+              onDrop={(index) => dropPlayer('teamOne', index)}
+              onDraftPlayerNameChange={setTeamOneDraftPlayer}
+              onRemovePlayer={(index) => removePlayer('teamOne', index)}
+              onSubmitPlayer={() => addPlayer('teamOne')}
+              onUpdatePlayer={(index, value) => updatePlayer('teamOne', index, value)}
+              players={teamOnePlayers}
+              placeholder="Team 1"
+              showHomeToggle
+              trackBatting={trackedBatting.teamOne}
+              team="teamOne"
+            />
+          </div>
 
-            <div className="team-card-grid">
-              <div className="team-column">
-                <TeamTrackingSwitch
-                  label={teamOneLabel}
-                  onChange={(shouldTrackBatting) => setTeamBattingTracking('teamOne', shouldTrackBatting)}
-                  trackBatting={trackedBatting.teamOne}
-                />
-                <TeamSetupCard
-                  draggedPlayer={draggedPlayer}
-                  dropTarget={dropTarget}
-                  draftPlayerName={teamOneDraftPlayer}
-                  hasDuplicateTeamNames={hasDuplicateTeamNames}
-                  isHome={homeTeam === 'teamOne'}
-                  name={teamOneName}
-                  onMakeHome={swapHomeTeam}
-                  onNameChange={setTeamOneName}
-                  onDragEnd={() => {
-                    setDraggedPlayer(null)
-                    setDropTarget(null)
-                  }}
-                  onDragOver={(index) => setDropTarget({ team: 'teamOne', index })}
-                  onDragStart={(index) => setDraggedPlayer({ team: 'teamOne', index })}
-                  onDrop={(index) => dropPlayer('teamOne', index)}
-                  onDraftPlayerNameChange={setTeamOneDraftPlayer}
-                  onRemovePlayer={(index) => removePlayer('teamOne', index)}
-                  onSubmitPlayer={() => addPlayer('teamOne')}
-                  onUpdatePlayer={(index, value) => updatePlayer('teamOne', index, value)}
-                  players={teamOnePlayers}
-                  placeholder="Team 1"
-                  showHomeToggle
-                  trackBatting={trackedBatting.teamOne}
-                  team="teamOne"
-                />
-              </div>
-
-              <div className="team-column">
-                <TeamTrackingSwitch
-                  label={teamTwoLabel}
-                  onChange={(shouldTrackBatting) => setTeamBattingTracking('teamTwo', shouldTrackBatting)}
-                  trackBatting={trackedBatting.teamTwo}
-                />
-                <TeamSetupCard
-                  draggedPlayer={draggedPlayer}
-                  dropTarget={dropTarget}
-                  draftPlayerName={teamTwoDraftPlayer}
-                  hasDuplicateTeamNames={hasDuplicateTeamNames}
-                  isHome={homeTeam === 'teamTwo'}
-                  name={teamTwoName}
-                  onMakeHome={swapHomeTeam}
-                  onNameChange={setTeamTwoName}
-                  onDragEnd={() => {
-                    setDraggedPlayer(null)
-                    setDropTarget(null)
-                  }}
-                  onDragOver={(index) => setDropTarget({ team: 'teamTwo', index })}
-                  onDragStart={(index) => setDraggedPlayer({ team: 'teamTwo', index })}
-                  onDrop={(index) => dropPlayer('teamTwo', index)}
-                  onDraftPlayerNameChange={setTeamTwoDraftPlayer}
-                  onRemovePlayer={(index) => removePlayer('teamTwo', index)}
-                  onSubmitPlayer={() => addPlayer('teamTwo')}
-                  onUpdatePlayer={(index, value) => updatePlayer('teamTwo', index, value)}
-                  players={teamTwoPlayers}
-                  placeholder="Team 2"
-                  showHomeToggle
-                  trackBatting={trackedBatting.teamTwo}
-                  team="teamTwo"
-                />
-              </div>
-            </div>
-          </section>
+          <div className="team-column">
+            <TeamSetupCard
+              draggedPlayer={draggedPlayer}
+              dropTarget={dropTarget}
+              draftPlayerName={teamTwoDraftPlayer}
+              hasDuplicateTeamNames={hasDuplicateTeamNames}
+              isHome={homeTeam === 'teamTwo'}
+              name={teamTwoName}
+              onBattingTrackingChange={(shouldTrackBatting) => setTeamBattingTracking('teamTwo', shouldTrackBatting)}
+              onMakeHome={swapHomeTeam}
+              onNameChange={setTeamTwoName}
+              onDragEnd={() => {
+                setDraggedPlayer(null)
+                setDropTarget(null)
+              }}
+              onDragOver={(index) => setDropTarget({ team: 'teamTwo', index })}
+              onDragStart={(index) => setDraggedPlayer({ team: 'teamTwo', index })}
+              onDrop={(index) => dropPlayer('teamTwo', index)}
+              onDraftPlayerNameChange={setTeamTwoDraftPlayer}
+              onRemovePlayer={(index) => removePlayer('teamTwo', index)}
+              onSubmitPlayer={() => addPlayer('teamTwo')}
+              onUpdatePlayer={(index, value) => updatePlayer('teamTwo', index, value)}
+              players={teamTwoPlayers}
+              placeholder="Team 2"
+              showHomeToggle
+              trackBatting={trackedBatting.teamTwo}
+              team="teamTwo"
+            />
+          </div>
+        </div>
       </div>
 
       {hasDuplicateTeamNames && <p className="setup-error">Team names must be different.</p>}
 
       <div className="create-game-actions">
+        <div className="floating-innings-control">
+          <div
+            className="innings-pill-stepper"
+            aria-label="Number of innings"
+            onWheel={(event) => {
+              event.preventDefault()
+              setInnings((current) => {
+                const direction = event.deltaY < 0 ? 1 : -1
+                return Math.min(20, Math.max(1, current + direction))
+              })
+            }}
+          >
+            <span>Innings</span>
+            <button type="button" aria-label="Decrease innings" onClick={() => setInnings((current) => Math.max(1, current - 1))}>
+              <svg viewBox="0 0 16 16" aria-hidden="true">
+                <path d="m10 4-4 4 4 4" />
+              </svg>
+            </button>
+            <input
+              aria-label="Innings"
+              inputMode="numeric"
+              max={20}
+              min={1}
+              type="number"
+              value={innings}
+              onChange={(event) => {
+                const nextInnings = Number(event.target.value)
+                if (!Number.isNaN(nextInnings)) {
+                  setInnings(Math.min(20, Math.max(1, nextInnings)))
+                }
+              }}
+            />
+            <button type="button" aria-label="Increase innings" onClick={() => setInnings((current) => Math.min(20, current + 1))}>
+              <svg viewBox="0 0 16 16" aria-hidden="true">
+                <path d="m6 4 4 4-4 4" />
+              </svg>
+            </button>
+          </div>
+        </div>
         <button type="button" onClick={onBeginGame} disabled={hasDuplicateTeamNames}>
           Start Game
         </button>
@@ -225,6 +227,7 @@ type TeamSetupCardProps = {
   hasDuplicateTeamNames: boolean
   isHome: boolean
   name: string
+  onBattingTrackingChange: (shouldTrackBatting: boolean) => void
   onDraftPlayerNameChange: (name: string) => void
   onDragEnd: () => void
   onDragOver: (index: number) => void
@@ -249,6 +252,7 @@ function TeamSetupCard({
   hasDuplicateTeamNames,
   isHome,
   name,
+  onBattingTrackingChange,
   onDraftPlayerNameChange,
   onDragEnd,
   onDragOver,
@@ -266,6 +270,14 @@ function TeamSetupCard({
   team,
 }: TeamSetupCardProps) {
   const displayName = name.trim() || placeholder
+  const isPreviewingSwap = draggedPlayer?.team === team && dropTarget?.team === team
+  const previewRows = players.map((player, index) => ({ player, sourceIndex: index }))
+
+  if (isPreviewingSwap && draggedPlayer.index !== dropTarget.index) {
+    const targetRow = previewRows[dropTarget.index]
+    previewRows[dropTarget.index] = previewRows[draggedPlayer.index]
+    previewRows[draggedPlayer.index] = targetRow
+  }
 
   return (
     <div className="team-setup-card has-lineup">
@@ -273,12 +285,23 @@ function TeamSetupCard({
         <input
           className={hasDuplicateTeamNames ? 'team-heading-input has-error' : 'team-heading-input'}
           aria-label={`${placeholder} name`}
+          maxLength={TEAM_NAME_MAX_LENGTH}
           value={name}
           onBlur={() => onNameChange(name.trim())}
           onChange={(event) => onNameChange(event.target.value)}
           placeholder={placeholder}
         />
         <div className="team-card-controls">
+          <button
+            className={trackBatting ? 'team-mode-action active' : 'team-mode-action'}
+            type="button"
+            onClick={() => onBattingTrackingChange(!trackBatting)}
+          >
+            <span>{trackBatting ? 'At-Bats & Runs' : 'Runs Only'}</span>
+            <svg className="mode-swap-icon" viewBox="0 0 16 16" aria-hidden="true">
+              <path d="M4.5 4.25h7m0 0-2-2m2 2-2 2M11.5 11.75h-7m0 0 2 2m-2-2 2-2" />
+            </svg>
+          </button>
           {showHomeToggle ? (
             <button className={isHome ? 'home-status active' : 'home-status'} type="button" onClick={onMakeHome}>
               <span>{isHome ? 'Home' : 'Away'}</span>
@@ -294,41 +317,48 @@ function TeamSetupCard({
       <div className={trackBatting ? 'player-tile-list compact' : 'player-tile-list compact disabled'} aria-label={`${displayName} batting order`}>
         {trackBatting ? (
           <>
-            {players.length === 0 && <p className="empty-roster">No players added yet.</p>}
-            {players.map((player, index) => (
-              <div
-                className={[
-                  'player-tile',
-                  draggedPlayer?.team === team && draggedPlayer.index === index ? 'dragging' : '',
-                  dropTarget?.team === team && dropTarget.index === index ? 'drop-target' : '',
-                ].filter(Boolean).join(' ')}
-                key={`${player}-${index}`}
-                onDragEnd={onDragEnd}
-                onDragOver={(event) => {
-                  event.preventDefault()
-                  onDragOver(index)
-                }}
-                onDrop={() => onDrop(index)}
-              >
-                <span
-                  className="drag-handle"
-                  draggable
-                  role="button"
-                  aria-label={`Drag ${player || `player ${index + 1}`}`}
-                  onDragStart={() => onDragStart(index)}
-                />
-                <span className="player-order">{index + 1}</span>
-                <input
-                  className="player-name-input"
-                  aria-label={`Player ${index + 1} name`}
-                  value={player}
-                  onChange={(event) => onUpdatePlayer(index, event.target.value)}
-                />
-                <button className="remove-player-button" type="button" aria-label={`Remove ${player}`} onClick={() => onRemovePlayer(index)}>
-                  <span aria-hidden="true" />
-                </button>
-              </div>
-            ))}
+            {previewRows.map(({ player, sourceIndex }, index) => {
+              const isDraggedPosition = draggedPlayer?.team === team && draggedPlayer.index === sourceIndex
+              const isDropPosition = dropTarget?.team === team && dropTarget.index === index
+
+              return (
+                <div
+                  className={[
+                    'player-tile',
+                    isPreviewingSwap ? 'swap-preview' : '',
+                    isDraggedPosition ? 'dragging' : '',
+                    isDropPosition ? 'drop-target' : '',
+                  ].filter(Boolean).join(' ')}
+                  key={index}
+                  onDragEnd={onDragEnd}
+                  onDragOver={(event) => {
+                    event.preventDefault()
+                    onDragOver(index)
+                  }}
+                  onDragEnter={() => onDragOver(index)}
+                  onDrop={() => onDrop(index)}
+                >
+                  <span
+                    className="drag-handle"
+                    draggable
+                    role="button"
+                    aria-label={`Drag ${player || `player ${index + 1}`}`}
+                    onDragStart={() => onDragStart(index)}
+                  />
+                  <span className="player-order">{index + 1}</span>
+                  <input
+                    className="player-name-input"
+                    aria-label={`Player ${index + 1} name`}
+                    maxLength={PLAYER_NAME_MAX_LENGTH}
+                    value={player}
+                    onChange={(event) => onUpdatePlayer(sourceIndex, event.target.value)}
+                  />
+                  <button className="remove-player-button" type="button" aria-label={`Remove ${player}`} onClick={() => onRemovePlayer(sourceIndex)}>
+                    <span aria-hidden="true" />
+                  </button>
+                </div>
+              )
+            })}
             <form
               className="inline-player-row"
               onSubmit={(event) => {
@@ -339,6 +369,7 @@ function TeamSetupCard({
               <span className="draft-drag-placeholder" aria-hidden="true" />
               <span className="player-order draft">{players.length + 1}</span>
               <input
+                maxLength={PLAYER_NAME_MAX_LENGTH}
                 placeholder="Player name"
                 value={draftPlayerName}
                 onBlur={onSubmitPlayer}
@@ -349,30 +380,9 @@ function TeamSetupCard({
           </>
         ) : (
           <div className="lineup-disabled-message">
-            Batting order not tracked. Runs will be entered as they score.
+            <p>Batting order and at-bats are not tracked. Runs are entered per inning for this team.</p>
           </div>
         )}
-      </div>
-    </div>
-  )
-}
-
-type TeamTrackingSwitchProps = {
-  label: string
-  onChange: (shouldTrackBatting: boolean) => void
-  trackBatting: boolean
-}
-
-function TeamTrackingSwitch({ label, onChange, trackBatting }: TeamTrackingSwitchProps) {
-  return (
-    <div className="team-tracking-row">
-      <div className="team-track-switch" aria-label={`${label} batting tracking`}>
-        <button className={trackBatting ? 'active' : ''} type="button" onClick={() => onChange(true)}>
-          Track Batting
-        </button>
-        <button className={!trackBatting ? 'active' : ''} type="button" onClick={() => onChange(false)}>
-          Runs Only
-        </button>
       </div>
     </div>
   )

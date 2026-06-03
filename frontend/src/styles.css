@@ -630,7 +630,8 @@ body {
 }
 
 .setup-error {
-  margin: 12px 0 0;
+  width: min(760px, 100%);
+  margin: 12px auto 0;
   color: #b42318;
   font-size: 13px;
 }
@@ -698,6 +699,8 @@ body {
 .create-game-stack {
   display: grid;
   gap: 16px;
+  width: min(760px, 100%);
+  margin: 0 auto;
 }
 
 .create-game-grid {
@@ -755,36 +758,9 @@ body {
   gap: 18px;
 }
 
-.teams-card-heading {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 18px;
-  align-items: start;
-}
-
-.teams-card-heading > div:first-child {
-  min-width: 0;
-}
-
-.teams-innings-control {
-  display: grid;
-  gap: 8px;
-  justify-items: end;
-}
-
-.teams-innings-control > span {
-  color: var(--color-muted);
-  font-size: 12px;
-  font-weight: 650;
-  letter-spacing: 0.04em;
-  line-height: 1.2;
-  text-transform: uppercase;
-  white-space: nowrap;
-}
-
 .team-card-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: 14px;
 }
 
@@ -795,7 +771,7 @@ body {
 
 .team-setup-card {
   overflow: hidden;
-  border: 1px solid #edf0f3;
+  border: 1px solid rgba(18, 56, 44, 0.34);
   border-radius: 14px;
   background: #ffffff;
 }
@@ -810,25 +786,34 @@ body {
 }
 
 .team-setup-card.has-lineup .team-setup-heading {
-  border-bottom: 1px solid #edf0f3;
+  border-bottom: 1px solid rgba(18, 56, 44, 0.18);
 }
 
 .team-heading-input {
   min-width: 0;
-  border: 0;
-  background: transparent;
+  min-height: 38px;
+  border: 1px solid rgba(18, 56, 44, 0.18);
+  border-radius: 10px;
+  background: #ffffff;
   color: var(--color-navy);
   font: inherit;
   font-size: 16px;
   font-weight: 650;
+  padding: 0 12px;
   outline: none;
 }
 
 .team-heading-input::placeholder {
-  color: #94a3b8;
+  color: #7d8c86;
+}
+
+.team-heading-input:focus {
+  border-color: var(--color-dark-green);
+  box-shadow: 0 0 0 3px rgba(18, 56, 44, 0.12);
 }
 
 .team-heading-input.has-error {
+  border-color: #b42318;
   color: #b42318;
 }
 
@@ -838,28 +823,17 @@ body {
   gap: 8px;
 }
 
-.team-tracking-row {
-  display: flex;
+.team-mode-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   justify-content: center;
-  padding: 0 12px;
-}
-
-.team-track-switch {
-  display: inline-grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
   min-height: 30px;
-  overflow: hidden;
-  border: 1px solid #edf0f3;
+  min-width: 138px;
+  border: 1px solid #dce5df;
   border-radius: 999px;
   background: #ffffff;
-  width: min(100%, 260px);
-}
-
-.team-track-switch button {
-  min-width: 0;
-  border: 0;
-  background: transparent;
-  color: var(--color-muted);
+  color: var(--color-dark-green);
   font: inherit;
   font-size: 11px;
   font-weight: 700;
@@ -869,9 +843,30 @@ body {
   cursor: pointer;
 }
 
-.team-track-switch button.active {
-  background: var(--color-gold);
-  color: #ffffff;
+.mode-swap-icon {
+  width: 15px;
+  height: 15px;
+  flex: 0 0 auto;
+  fill: none;
+  opacity: 0.72;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+
+.team-mode-action.active {
+  border-color: var(--color-gold);
+  background: rgba(var(--color-primary-rgb), 0.1);
+  color: var(--color-primary);
+}
+
+.team-mode-action:hover {
+  background: #f1f5f3;
+}
+
+.team-mode-action.active:hover {
+  background: rgba(var(--color-primary-rgb), 0.16);
 }
 
 .home-status {
@@ -880,7 +875,7 @@ body {
   gap: 6px;
   justify-content: center;
   min-height: 30px;
-  min-width: 58px;
+  width: 74px;
   border: 1px solid #edf0f3;
   border-radius: 999px;
   background: #ffffff;
@@ -966,20 +961,24 @@ body {
   padding: 16px;
   color: var(--color-muted);
   font-size: 13px;
-  font-style: italic;
   line-height: 1.4;
   text-align: center;
 }
 
+.lineup-disabled-message p {
+  margin: 0;
+  font-style: italic;
+}
+
 .inline-player-row {
   display: grid;
-  grid-template-columns: 28px 34px minmax(0, 1fr) 34px;
+  grid-template-columns: 18px 28px minmax(0, 1fr) 28px;
   align-items: center;
-  gap: 10px;
+  column-gap: 6px;
   min-height: 46px;
-  border-top: 1px solid #edf0f3;
+  border-top: 1px solid rgba(18, 56, 44, 0.14);
   background: #fbfcfd;
-  padding: 0 10px;
+  padding: 0 8px;
 }
 
 .inline-player-row input {
@@ -998,8 +997,8 @@ body {
 
 .draft-drag-placeholder,
 .draft-action-placeholder {
-  width: 28px;
-  height: 28px;
+  width: 18px;
+  height: 24px;
 }
 
 .player-order.draft {
@@ -1011,12 +1010,103 @@ body {
   bottom: 18px;
   z-index: 10;
   display: flex;
+  align-items: center;
+  gap: 10px;
   justify-content: center;
   margin-top: 22px;
   pointer-events: none;
 }
 
-.create-game-actions button {
+.floating-innings-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 48px;
+  pointer-events: auto;
+}
+
+.innings-pill-stepper {
+  display: grid;
+  grid-template-columns: auto 28px 38px 28px;
+  align-items: center;
+  gap: 4px;
+  min-width: 164px;
+  height: 48px;
+  border: 2px solid var(--color-gold);
+  border-radius: 999px;
+  background: #ffffff;
+  color: var(--color-navy);
+  overflow: hidden;
+  padding: 0 8px 0 16px;
+  box-shadow: 0 16px 36px rgba(0, 16, 32, 0.08);
+}
+
+.innings-pill-stepper:focus-within {
+  border-color: var(--color-gold);
+}
+
+.innings-pill-stepper > span {
+  color: var(--color-muted);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.innings-pill-stepper button {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--color-muted);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  padding: 0;
+  cursor: pointer;
+}
+
+.innings-pill-stepper button:hover {
+  background: rgba(var(--color-primary-rgb), 0.1);
+  color: var(--color-primary);
+}
+
+.innings-pill-stepper svg {
+  width: 12px;
+  height: 12px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
+}
+
+.innings-pill-stepper input {
+  width: 100%;
+  height: 34px;
+  border: 0;
+  background: transparent;
+  color: var(--color-navy);
+  font: inherit;
+  font-size: 18px;
+  font-weight: 650;
+  line-height: 1;
+  text-align: center;
+  outline: none;
+}
+
+.innings-pill-stepper input::-webkit-outer-spin-button,
+.innings-pill-stepper input::-webkit-inner-spin-button {
+  margin: 0;
+  appearance: none;
+}
+
+.create-game-actions > button {
   min-height: 48px;
   border: 1px solid var(--color-gold);
   border-radius: 999px;
@@ -1033,7 +1123,7 @@ body {
   box-shadow: 0 16px 36px rgba(208, 144, 64, 0.24);
 }
 
-.create-game-actions button:disabled {
+.create-game-actions > button:disabled {
   cursor: not-allowed;
   opacity: 0.55;
 }
@@ -1076,53 +1166,6 @@ body {
   color: var(--color-muted);
   font-size: 13px;
   font-weight: 500;
-}
-
-.innings-stepper {
-  display: grid;
-  grid-template-columns: 1fr 36px;
-  align-items: stretch;
-  width: 92px;
-  min-height: 46px;
-  border: 1px solid var(--color-border);
-  border-radius: 10px;
-  overflow: hidden;
-  background: #ffffff;
-}
-
-.innings-stepper strong {
-  display: grid;
-  place-items: center;
-  color: var(--color-navy);
-  font-size: 20px;
-  font-weight: 600;
-}
-
-.stepper-buttons {
-  display: grid;
-  grid-template-rows: 1fr 1fr;
-  border-left: 1px solid var(--color-border);
-}
-
-.stepper-buttons button {
-  display: grid;
-  place-items: center;
-  border: 0;
-  background: #ffffff;
-  color: var(--color-muted);
-  font: inherit;
-  font-size: 11px;
-  line-height: 1;
-  cursor: pointer;
-}
-
-.stepper-buttons button + button {
-  border-top: 1px solid var(--color-border);
-}
-
-.stepper-buttons button:hover {
-  background: rgba(var(--color-primary-rgb), 0.12);
-  color: var(--color-dark-green);
 }
 
 .segmented-control {
@@ -1349,16 +1392,16 @@ body {
 
 .player-tile {
   display: grid;
-  grid-template-columns: 28px 34px minmax(0, 1fr) 34px;
+  grid-template-columns: 18px 28px minmax(0, 1fr) 28px;
   align-items: center;
-  gap: 10px;
+  column-gap: 6px;
   min-height: 46px;
   background: #ffffff;
-  padding: 0 10px;
+  padding: 0 8px;
 }
 
 .player-tile + .player-tile {
-  border-top: 1px solid #edf0f3;
+  border-top: 1px solid rgba(18, 56, 44, 0.14);
 }
 
 .player-tile.dragging {
@@ -1366,19 +1409,32 @@ body {
   background: #f8fafc;
 }
 
+.player-tile.swap-preview {
+  transition:
+    background 140ms ease,
+    box-shadow 140ms ease,
+    transform 140ms ease;
+}
+
 .player-tile.drop-target {
-  box-shadow: inset 3px 0 0 var(--color-gold);
+  position: relative;
+  z-index: 1;
+  background: #ffffff;
+  box-shadow:
+    inset 3px 0 0 var(--color-gold),
+    0 10px 24px rgba(0, 16, 32, 0.1);
+  transform: translateY(-1px);
 }
 
 .player-order {
   display: grid;
   place-items: center;
-  width: 28px;
-  height: 28px;
+  width: 24px;
+  height: 24px;
   border-radius: 999px;
   background: #f8fafc;
   color: var(--color-muted);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
 }
 
@@ -1408,8 +1464,8 @@ body {
 .remove-player-button {
   display: grid;
   place-items: center;
-  width: 28px;
-  height: 28px;
+  width: 26px;
+  height: 26px;
   border: 0;
   border-radius: 999px;
   background: transparent;
@@ -1452,18 +1508,25 @@ body {
 
 .drag-handle {
   justify-self: center;
-  width: 28px;
-  height: 34px;
-  border-radius: 8px;
+  width: 14px;
+  height: 18px;
   cursor: grab;
   background-image:
-    radial-gradient(circle, #94a3b8 1.5px, transparent 1.5px),
-    radial-gradient(circle, #94a3b8 1.5px, transparent 1.5px);
+    radial-gradient(circle, #94a3b8 1.15px, transparent 1.25px),
+    radial-gradient(circle, #94a3b8 1.15px, transparent 1.25px),
+    radial-gradient(circle, #94a3b8 1.15px, transparent 1.25px),
+    radial-gradient(circle, #94a3b8 1.15px, transparent 1.25px),
+    radial-gradient(circle, #94a3b8 1.15px, transparent 1.25px),
+    radial-gradient(circle, #94a3b8 1.15px, transparent 1.25px);
   background-position:
-    8px 8px,
-    16px 8px;
-  background-repeat: repeat-y;
-  background-size: 12px 8px;
+    3px 3px,
+    10px 3px,
+    3px 9px,
+    10px 9px,
+    3px 15px,
+    10px 15px;
+  background-repeat: no-repeat;
+  background-size: 3px 3px;
 }
 
 .drag-handle:active {
@@ -1776,28 +1839,6 @@ body {
     grid-template-columns: 1fr;
   }
 
-  .teams-card-heading {
-    grid-template-columns: 1fr;
-  }
-
-  .teams-innings-control {
-    justify-items: start;
-  }
-
-  .team-setup-heading {
-    grid-template-columns: 1fr;
-  }
-
-  .team-card-controls {
-    align-items: stretch;
-    flex-direction: column;
-  }
-
-  .team-track-switch,
-  .home-status {
-    width: 100%;
-  }
-
   .create-game-card {
     border-radius: 14px;
     padding: 16px;
@@ -1810,10 +1851,6 @@ body {
 
   .create-game-actions {
     bottom: 12px;
-  }
-
-  .create-game-actions button {
-    width: min(100%, 360px);
   }
 
   .waitlist-modal {
