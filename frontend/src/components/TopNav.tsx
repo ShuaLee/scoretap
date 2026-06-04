@@ -1,13 +1,14 @@
 import logo from '../assets/logo.png'
 
 type TopNavProps = {
+  hasActiveGame: boolean
   onHome: () => void
   onJoinWaitlist: () => void
   onStartGame: () => void
   variant: 'home' | 'setup'
 }
 
-export function TopNav({ onHome, onJoinWaitlist, onStartGame, variant }: TopNavProps) {
+export function TopNav({ hasActiveGame, onHome, onJoinWaitlist, onStartGame, variant }: TopNavProps) {
   return (
     <header className="top-nav" aria-label="Top navigation">
       <div className="top-nav-inner">
@@ -19,7 +20,7 @@ export function TopNav({ onHome, onJoinWaitlist, onStartGame, variant }: TopNavP
         <div className="top-nav-actions">
           {variant === 'home' ? (
             <button className="new-game-button" type="button" onClick={onStartGame}>
-              Start New Game!
+              {hasActiveGame ? 'Continue Game' : 'Start New Game!'}
             </button>
           ) : (
             <button className="nav-waitlist-button" type="button" onClick={onJoinWaitlist}>

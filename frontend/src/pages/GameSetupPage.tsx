@@ -5,6 +5,8 @@ type TeamKey = 'teamOne' | 'teamTwo'
 export type GameConfig = {
   teamOneName: string
   teamTwoName: string
+  teamOnePlayers: string[]
+  teamTwoPlayers: string[]
 }
 
 type GameSetupPageProps = {
@@ -12,7 +14,7 @@ type GameSetupPageProps = {
 }
 
 const TEAM_NAME_MAX_LENGTH = 45
-const PLAYER_NAME_MAX_LENGTH = 24
+export const PLAYER_NAME_MAX_LENGTH = 24
 
 export function GameSetupPage({ onBeginGame }: GameSetupPageProps) {
   const [trackedBatting, setTrackedBatting] = useState<Record<TeamKey, boolean>>({
@@ -34,8 +36,8 @@ export function GameSetupPage({ onBeginGame }: GameSetupPageProps) {
   const teamOneLabel = teamOneName.trim() || 'Team 1'
   const teamTwoLabel = teamTwoName.trim() || 'Team 2'
   const hasDuplicateTeamNames = teamOneLabel.toLowerCase() === teamTwoLabel.toLowerCase()
-  const teamOneHasLineup = teamOnePlayers.some((player) => player.trim()) || Boolean(teamOneDraftPlayer.trim())
-  const teamTwoHasLineup = teamTwoPlayers.some((player) => player.trim()) || Boolean(teamTwoDraftPlayer.trim())
+  const teamOneHasLineup = teamOnePlayers.some((player) => player.trim())
+  const teamTwoHasLineup = teamTwoPlayers.some((player) => player.trim())
   const missingTrackedLineups =
     (trackedBatting.teamOne && !teamOneHasLineup) || (trackedBatting.teamTwo && !teamTwoHasLineup)
   const cannotStartGame = hasDuplicateTeamNames
@@ -46,21 +48,18 @@ export function GameSetupPage({ onBeginGame }: GameSetupPageProps) {
       return
     }
 
-    setTeamOnePlayers((players) => {
-      const nextPlayers = players.map((player) => player.trim()).filter(Boolean)
-      const draftPlayer = teamOneDraftPlayer.trim()
-      return draftPlayer ? [...nextPlayers, draftPlayer] : nextPlayers
-    })
-    setTeamTwoPlayers((players) => {
-      const nextPlayers = players.map((player) => player.trim()).filter(Boolean)
-      const draftPlayer = teamTwoDraftPlayer.trim()
-      return draftPlayer ? [...nextPlayers, draftPlayer] : nextPlayers
-    })
+    const finalTeamOnePlayers = teamOnePlayers.map((player) => player.trim()).filter(Boolean)
+    const finalTeamTwoPlayers = teamTwoPlayers.map((player) => player.trim()).filter(Boolean)
+
+    setTeamOnePlayers(finalTeamOnePlayers)
+    setTeamTwoPlayers(finalTeamTwoPlayers)
     setTeamOneDraftPlayer('')
     setTeamTwoDraftPlayer('')
     onBeginGame({
       teamOneName: teamOneLabel,
       teamTwoName: teamTwoLabel,
+      teamOnePlayers: finalTeamOnePlayers,
+      teamTwoPlayers: finalTeamTwoPlayers,
     })
   }
 
@@ -403,16 +402,18 @@ function TeamSetupCard({
                 onSubmitPlayer()
               }}
             >
-              <span className="draft-drag-placeholder" aria-hidden="true" />
               <span className="player-order draft">{players.length + 1}</span>
               <input
                 maxLength={PLAYER_NAME_MAX_LENGTH}
                 placeholder="Player name"
                 value={draftPlayerName}
-                onBlur={onSubmitPlayer}
                 onChange={(event) => onDraftPlayerNameChange(event.target.value)}
               />
-              <span className="draft-action-placeholder" aria-hidden="true" />
+              <button className="add-inline-player-button" type="submit" aria-label={`Add player to ${displayName}`}>
+                <svg viewBox="0 0 16 16" aria-hidden="true">
+                  <path d="M8 3.5v9M3.5 8h9" />
+                </svg>
+              </button>
             </form>
           </>
         ) : (
