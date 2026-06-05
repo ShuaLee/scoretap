@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState, type DragEvent } from 'react'
 import { Scoreboard } from '../components/Scoreboard'
 import { PLAYER_NAME_MAX_LENGTH, type GameConfig } from './GameSetupPage'
 
@@ -24,6 +24,23 @@ type ScoreModification = {
   home: number
   away: number
 }
+type MovePreview = {
+  bases: Bases
+  blocked: boolean
+  scoringRunner: Runner | null
+}
+
+type GameSnapshot = {
+  awayBatterIndex: number
+  awayScore: number
+  bases: Bases
+  halfInning: 'top' | 'bottom'
+  homeBatterIndex: number
+  homeScore: number
+  inning: number
+  outs: number
+  pendingScorers: Runner[]
+}
 
 export type PersistedGameState = {
   awayBatterIndex: number
@@ -39,6 +56,7 @@ export type PersistedGameState = {
   scoreModification: ScoreModification
   teamOnePlayers: string[]
   teamTwoPlayers: string[]
+  undoStack?: GameSnapshot[]
 }
 
 const emptyBases: Bases = {
@@ -64,6 +82,7 @@ export function ScoreGamePage({ gameConfig, initialState, onGameStateChange }: S
   const [draggedRunnerSource, setDraggedRunnerSource] = useState<RunnerSource | null>(null)
   const [scoreAdjustments, setScoreAdjustments] = useState<ScoreAdjustments>(initialState?.scoreAdjustments ?? {})
   const [scoreModification, setScoreModification] = useState<ScoreModification>(initialState?.scoreModification ?? { home: 0, away: 0 })
+  const [undoStack, setUndoStack] = useState<GameSnapshot[]>(initialState?.undoStack ?? [])
 
   const battingTeam: TeamSide = halfInning === 'top' ? 'away' : 'home'
   const battingTeamName = battingTeam === 'home' ? gameConfig.teamOneName : gameConfig.teamTwoName
@@ -94,6 +113,7 @@ export function ScoreGamePage({ gameConfig, initialState, onGameStateChange }: S
       scoreModification,
       teamOnePlayers,
       teamTwoPlayers,
+      undoStack,
     })
   }, [
     awayBatterIndex,
@@ -110,7 +130,49 @@ export function ScoreGamePage({ gameConfig, initialState, onGameStateChange }: S
     scoreModification,
     teamOnePlayers,
     teamTwoPlayers,
+    undoStack,
   ])
+
+  function createGameSnapshot(): GameSnapshot {
+    return {
+      awayBatterIndex,
+      awayScore,
+      bases,
+      halfInning,
+      homeBatterIndex,
+      homeScore,
+      inning,
+      outs,
+      pendingScorers,
+    }
+  }
+
+  function saveUndoSnapshot() {
+    const snapshot = createGameSnapshot()
+    setUndoStack((snapshots) => [...snapshots, snapshot].slice(-25))
+  }
+
+  function undoLastScoringAction() {
+    setUndoStack((snapshots) => {
+      const snapshot = snapshots[snapshots.length - 1]
+
+      if (!snapshot) {
+        return snapshots
+      }
+
+      setAwayBatterIndex(snapshot.awayBatterIndex)
+      setAwayScore(snapshot.awayScore)
+      setBases(snapshot.bases)
+      setHalfInning(snapshot.halfInning)
+      setHomeBatterIndex(snapshot.homeBatterIndex)
+      setHomeScore(snapshot.homeScore)
+      setInning(snapshot.inning)
+      setOuts(snapshot.outs)
+      setPendingScorers(snapshot.pendingScorers)
+
+      return snapshots.slice(0, -1)
+    })
+  }
 
   function scoreRunner(runner: Runner) {
     if (runner.team === 'home') {
@@ -129,6 +191,23 @@ export function ScoreGamePage({ gameConfig, initialState, onGameStateChange }: S
 
     scoreRunner(runner)
     setPendingScorers(remainingRunners)
+  }
+
+  function returnPendingScorerToThird() {
+    const [runner, ...remainingRunners] = pendingScorers
+    if (!runner) {
+      return
+    }
+
+    setBases((currentBases) => {
+      const displacedRunner = currentBases.third
+      setPendingScorers(displacedRunner ? [displacedRunner, ...remainingRunners] : remainingRunners)
+
+      return {
+        ...currentBases,
+        third: runner,
+      }
+    })
   }
 
   function advanceBatter() {
@@ -155,6 +234,7 @@ export function ScoreGamePage({ gameConfig, initialState, onGameStateChange }: S
   }
 
   function recordOut() {
+    saveUndoSnapshot()
     const nextOuts = outs + 1
     advanceBatter()
 
@@ -166,7 +246,29 @@ export function ScoreGamePage({ gameConfig, initialState, onGameStateChange }: S
     setOuts(nextOuts)
   }
 
+  function recordBaseRunnerOut(source: BaseKey) {
+    const runner = bases[source]
+    if (!runner) {
+      return
+    }
+
+    saveUndoSnapshot()
+    setBases((currentBases) => ({
+      ...currentBases,
+      [source]: null,
+    }))
+
+    const nextOuts = outs + 1
+    if (nextOuts >= 3) {
+      switchHalfInning()
+      return
+    }
+
+    setOuts(nextOuts)
+  }
+
   function recordHit(baseCount: number) {
+    saveUndoSnapshot()
     const nextBases: Bases = { first: null, second: null, third: null }
     const scoringRunners: Runner[] = []
 
@@ -205,59 +307,70 @@ export function ScoreGamePage({ gameConfig, initialState, onGameStateChange }: S
       return
     }
 
-    const sourceRunner = source === 'atBat' ? currentBatter : bases[source]
-    if (!sourceRunner) {
+    const preview = getMovePreview(source, target)
+    if (preview.blocked) {
       return
     }
 
-    setBases((currentBases) => {
-      const nextBases = { ...currentBases }
-      const targetRunner = target === 'atBat' ? null : nextBases[target]
+    setBases(preview.bases)
 
-      if (source !== 'atBat') {
-        nextBases[source] = targetRunner
-      }
-
-      if (target !== 'atBat') {
-        nextBases[target] = sourceRunner
-      }
-
-      return nextBases
-    })
+    if (preview.scoringRunner) {
+      const scoringRunner = preview.scoringRunner
+      setPendingScorers((runners) => [...runners, scoringRunner])
+    }
   }
 
-  function moveBaseRunner(source: BaseKey, direction: -1 | 1) {
-    const runner = bases[source]
-    if (!runner) {
-      return
+  function getMovePreview(source: RunnerSource, target: RunnerSource): MovePreview {
+    if (source === target || target === 'atBat') {
+      return { bases, blocked: false, scoringRunner: null }
     }
 
-    const currentBaseNumber = baseKeyToNumber(source)
-    const targetBaseNumber = currentBaseNumber + direction
-
-    if (targetBaseNumber < 1) {
-      setBases((currentBases) => ({
-        ...currentBases,
-        [source]: null,
-      }))
-      return
+    const sourceRunner = source === 'atBat' ? currentBatter : bases[source]
+    if (!sourceRunner) {
+      return { bases, blocked: true, scoringRunner: null }
     }
 
-    if (targetBaseNumber > 3) {
-      setBases((currentBases) => ({
-        ...currentBases,
-        [source]: null,
-      }))
-      setPendingScorers((runners) => [...runners, runner])
-      return
+    const direction = source === 'atBat' ? 1 : baseKeyToNumber(source) > baseKeyToNumber(target) ? -1 : 1
+    const nextBases = { ...bases }
+    let scoringRunner: Runner | null = null
+
+    if (source !== 'atBat') {
+      nextBases[source] = null
     }
 
-    moveRunner(source, baseNumberToKey(targetBaseNumber))
+    function placeRunner(runner: Runner, baseNumber: number): boolean {
+      if (baseNumber < 1) {
+        return false
+      }
+
+      if (baseNumber > 3) {
+        scoringRunner = runner
+        return true
+      }
+
+      const base = baseNumberToKey(baseNumber)
+      const displacedRunner = nextBases[base]
+      nextBases[base] = runner
+
+      if (!displacedRunner) {
+        return true
+      }
+
+      return placeRunner(displacedRunner, baseNumber + direction)
+    }
+
+    const isValidMove = placeRunner(sourceRunner, baseKeyToNumber(target))
+    if (!isValidMove) {
+      return { bases, blocked: true, scoringRunner: null }
+    }
+
+    return { bases: nextBases, blocked: false, scoringRunner }
   }
 
   return (
     <section className="score-game-page" aria-label="Score game">
       <Scoreboard
+        activeBattingTeam={battingTeam}
         awayTeamName={gameConfig.teamTwoName}
         awayScore={adjustedAwayScore}
         homeTeamName={gameConfig.teamOneName}
@@ -268,23 +381,27 @@ export function ScoreGamePage({ gameConfig, initialState, onGameStateChange }: S
       />
       <BaseOccupancy
         bases={bases}
-        currentBatter={currentBatter}
+        canUndo={undoStack.length > 0}
         draggedRunnerSource={draggedRunnerSource}
         onDragEnd={() => setDraggedRunnerSource(null)}
         onDragStart={setDraggedRunnerSource}
-        onManageBattingOrder={() => setIsBattingOrderOpen(true)}
-        onMoveBaseRunner={moveBaseRunner}
+        onGetMovePreview={getMovePreview}
         onMoveRunner={moveRunner}
+        onRequestRunnerOut={(_, source) => recordBaseRunnerOut(source)}
+        onReturnRunnerToThird={returnPendingScorerToThird}
+        pendingScorer={pendingScorers[0] ?? null}
+        pendingScorerCount={pendingScorers.length}
+        onConfirmRun={confirmScoredRunner}
+        onUndo={undoLastScoringAction}
       />
-      <ScoringActions onHit={recordHit} onOut={recordOut} />
-      {pendingScorers[0] && (
-        <section className="score-confirm-card" aria-label="Confirm run scored">
-          <span>{pendingScorers[0].name} made it home?</span>
-          <button type="button" onClick={confirmScoredRunner}>
-            Yes
-          </button>
-        </section>
-      )}
+      <GameActionPanel
+        batterIndex={batterIndex}
+        lineup={battingLineup}
+        onHit={recordHit}
+        onManageBattingOrder={() => setIsBattingOrderOpen(true)}
+        onOut={recordOut}
+        teamName={battingTeamName}
+      />
       {isScoreEditorOpen && (
         <ScoreEditorModal
           awayTeamName={gameConfig.teamTwoName}
@@ -434,49 +551,103 @@ function ScoreEditorModal({
 
 type BaseOccupancyProps = {
   bases: Bases
-  currentBatter: Runner
+  canUndo: boolean
   draggedRunnerSource: RunnerSource | null
+  onConfirmRun: () => void
   onDragEnd: () => void
+  onGetMovePreview: (source: RunnerSource, target: RunnerSource) => MovePreview
   onDragStart: (source: RunnerSource) => void
-  onManageBattingOrder: () => void
-  onMoveBaseRunner: (source: BaseKey, direction: -1 | 1) => void
   onMoveRunner: (source: RunnerSource, target: RunnerSource) => void
+  onRequestRunnerOut: (runner: Runner, source: BaseKey) => void
+  onReturnRunnerToThird: () => void
+  onUndo: () => void
+  pendingScorer: Runner | null
+  pendingScorerCount: number
 }
 
 function BaseOccupancy({
   bases,
-  currentBatter,
+  canUndo,
   draggedRunnerSource,
+  onConfirmRun,
   onDragEnd,
+  onGetMovePreview,
   onDragStart,
-  onManageBattingOrder,
-  onMoveBaseRunner,
   onMoveRunner,
+  onRequestRunnerOut,
+  onReturnRunnerToThird,
+  onUndo,
+  pendingScorer,
+  pendingScorerCount,
 }: BaseOccupancyProps) {
+  const [dragPreviewTarget, setDragPreviewTarget] = useState<RunnerSource | null>(null)
+  const movePreview = draggedRunnerSource && dragPreviewTarget ? onGetMovePreview(draggedRunnerSource, dragPreviewTarget) : null
+  const previewBases = bases
+
+  function handleDragEnd() {
+    setDragPreviewTarget(null)
+    onDragEnd()
+  }
+
+  function handleMoveRunner(source: RunnerSource, target: RunnerSource) {
+    setDragPreviewTarget(null)
+    onMoveRunner(source, target)
+  }
+
   return (
     <div className="base-area">
       <section className="base-occupancy-card" aria-label="Base runners">
-        <BaseSlot baseKey="third" className="base-slot-3b" label="3B" runner={bases.third} draggedRunnerSource={draggedRunnerSource} onDragEnd={onDragEnd} onDragStart={onDragStart} onMoveBaseRunner={onMoveBaseRunner} onMoveRunner={onMoveRunner} />
-        <BaseSlot baseKey="second" className="base-slot-2b" label="2B" runner={bases.second} draggedRunnerSource={draggedRunnerSource} onDragEnd={onDragEnd} onDragStart={onDragStart} onMoveBaseRunner={onMoveBaseRunner} onMoveRunner={onMoveRunner} />
-        <BaseSlot baseKey="first" className="base-slot-1b" label="1B" runner={bases.first} draggedRunnerSource={draggedRunnerSource} onDragEnd={onDragEnd} onDragStart={onDragStart} onMoveBaseRunner={onMoveBaseRunner} onMoveRunner={onMoveRunner} />
-        <BaseSlot baseKey="atBat" className="base-slot-home" label="Home" draggedRunnerSource={draggedRunnerSource} onDragEnd={onDragEnd} onDragStart={onDragStart} onMoveRunner={onMoveRunner} />
+        <button className="field-undo-button" type="button" aria-label="Undo last scoring action" disabled={!canUndo} onClick={onUndo}>
+          <svg viewBox="0 0 20 20" aria-hidden="true">
+            <path d="M7.25 6.25H4.5v-2.75" />
+            <path d="M4.75 6.25A6.25 6.25 0 1 1 4.4 14" />
+          </svg>
+        </button>
+        <BaseSlot baseKey="third" className="base-slot-3b" dragPreviewTarget={dragPreviewTarget} isPreviewBlocked={Boolean(movePreview?.blocked && dragPreviewTarget === 'third')} label="3B" runner={previewBases.third} draggedRunnerSource={draggedRunnerSource} onDragEnd={handleDragEnd} onDragStart={onDragStart} onMoveRunner={handleMoveRunner} onPreviewTargetChange={setDragPreviewTarget} onRequestRunnerOut={onRequestRunnerOut} />
+        <BaseSlot baseKey="second" className="base-slot-2b" dragPreviewTarget={dragPreviewTarget} isPreviewBlocked={Boolean(movePreview?.blocked && dragPreviewTarget === 'second')} label="2B" runner={previewBases.second} draggedRunnerSource={draggedRunnerSource} onDragEnd={handleDragEnd} onDragStart={onDragStart} onMoveRunner={handleMoveRunner} onPreviewTargetChange={setDragPreviewTarget} onRequestRunnerOut={onRequestRunnerOut} />
+        <BaseSlot baseKey="first" className="base-slot-1b" dragPreviewTarget={dragPreviewTarget} isPreviewBlocked={Boolean(movePreview?.blocked && dragPreviewTarget === 'first')} label="1B" runner={previewBases.first} draggedRunnerSource={draggedRunnerSource} onDragEnd={handleDragEnd} onDragStart={onDragStart} onMoveRunner={handleMoveRunner} onPreviewTargetChange={setDragPreviewTarget} onRequestRunnerOut={onRequestRunnerOut} />
+        <HomeScoringSlot pendingScorer={pendingScorer} pendingScorerCount={pendingScorerCount} onConfirmRun={onConfirmRun} onReturnRunnerToThird={onReturnRunnerToThird} />
       </section>
-      <section
-        className="at-bat-card"
-        aria-label="Current batter"
-        onDragOver={(event) => event.preventDefault()}
-        onDrop={() => {
-          if (draggedRunnerSource) {
-            onMoveRunner(draggedRunnerSource, 'atBat')
-          }
-        }}
-      >
-        <span>At Bat</span>
-        <RunnerTile runner={currentBatter} source="atBat" />
-      </section>
-      <button className="manage-batting-order-button" type="button" onClick={onManageBattingOrder}>
-        Batting Order
-      </button>
+    </div>
+  )
+}
+
+type HomeScoringSlotProps = {
+  onConfirmRun: () => void
+  onReturnRunnerToThird: () => void
+  pendingScorer: Runner | null
+  pendingScorerCount: number
+}
+
+function HomeScoringSlot({ onConfirmRun, onReturnRunnerToThird, pendingScorer, pendingScorerCount }: HomeScoringSlotProps) {
+  return (
+    <div className={`base-slot base-slot-home${pendingScorer ? ' has-runner' : ''}`}>
+      {!pendingScorer && (
+        <div className="base-slot-empty">
+          <span className="base-slot-label">Home</span>
+        </div>
+      )}
+      {pendingScorer && (
+        <div className="home-score-card">
+          <div className="home-score-card-main">
+            <strong>{pendingScorer.name}</strong>
+            <em>Scored?</em>
+          </div>
+          <div className="home-score-actions">
+            <button className="home-score-action secondary" type="button" aria-label={`Send ${pendingScorer.name} back to third`} onClick={onReturnRunnerToThird}>
+              <svg viewBox="0 0 16 16" aria-hidden="true">
+                <path d="m10 4-4 4 4 4" />
+              </svg>
+            </button>
+            <button className="home-score-action primary" type="button" aria-label={`Confirm ${pendingScorer.name} scored`} onClick={onConfirmRun}>
+              <svg viewBox="0 0 16 16" aria-hidden="true">
+                <path d="m4 8.25 2.25 2.25L12 5" />
+              </svg>
+            </button>
+          </div>
+          {pendingScorerCount > 1 && <span className="home-score-queue">+{pendingScorerCount - 1}</span>}
+        </div>
+      )}
     </div>
   )
 }
@@ -484,34 +655,63 @@ function BaseOccupancy({
 type BaseSlotProps = {
   baseKey: RunnerSource
   className: string
+  dragPreviewTarget: RunnerSource | null
   draggedRunnerSource: RunnerSource | null
+  isPreviewBlocked: boolean
   label: string
   onDragEnd: () => void
   onDragStart: (source: RunnerSource) => void
-  onMoveBaseRunner?: (source: BaseKey, direction: -1 | 1) => void
   onMoveRunner: (source: RunnerSource, target: RunnerSource) => void
+  onPreviewTargetChange: (target: RunnerSource | null) => void
+  onRequestRunnerOut: (runner: Runner, source: BaseKey) => void
   runner?: Runner | null
 }
 
-function BaseSlot({ baseKey, className, draggedRunnerSource, label, onDragEnd, onDragStart, onMoveBaseRunner, onMoveRunner, runner }: BaseSlotProps) {
+function BaseSlot({ baseKey, className, dragPreviewTarget, draggedRunnerSource, isPreviewBlocked, label, onDragEnd, onDragStart, onMoveRunner, onPreviewTargetChange, onRequestRunnerOut, runner }: BaseSlotProps) {
+  const isPreviewTarget = dragPreviewTarget === baseKey && draggedRunnerSource !== baseKey
+  const isDragOrigin = draggedRunnerSource === baseKey
+  const previewClass = [
+    isDragOrigin ? 'drag-origin' : '',
+    isPreviewTarget ? 'preview-target' : '',
+    isPreviewBlocked ? 'preview-blocked' : '',
+  ]
+    .filter(Boolean)
+    .join(' ')
+
   return (
     <div
-      className={`base-slot ${className}${runner ? ' has-runner' : ''}`}
-      onDragOver={(event) => event.preventDefault()}
+      className={`base-slot ${className}${runner ? ' has-runner' : ''}${previewClass ? ` ${previewClass}` : ''}`}
+      onDragEnter={() => {
+        if (draggedRunnerSource && draggedRunnerSource !== baseKey) {
+          onPreviewTargetChange(baseKey)
+        }
+      }}
+      onDragOver={(event) => {
+        event.preventDefault()
+        if (draggedRunnerSource && draggedRunnerSource !== baseKey) {
+          onPreviewTargetChange(baseKey)
+        }
+      }}
+      onDragLeave={() => onPreviewTargetChange(null)}
       onDrop={() => {
         if (draggedRunnerSource) {
           onMoveRunner(draggedRunnerSource, baseKey)
         }
       }}
     >
-      <span className="base-slot-label">{label}</span>
+      {!runner && (
+        <div className="base-slot-empty">
+          <span className="base-slot-label">{label}</span>
+        </div>
+      )}
       {runner && (
         <RunnerTile
+          baseLabel={label}
           runner={runner}
           source={baseKey}
           onDragEnd={onDragEnd}
           onDragStart={onDragStart}
-          onMoveBaseRunner={onMoveBaseRunner}
+          onRequestRunnerOut={onRequestRunnerOut}
         />
       )}
     </div>
@@ -519,38 +719,76 @@ function BaseSlot({ baseKey, className, draggedRunnerSource, label, onDragEnd, o
 }
 
 type RunnerTileProps = {
+  baseLabel?: string
   onDragEnd?: () => void
   onDragStart?: (source: RunnerSource) => void
-  onMoveBaseRunner?: (source: BaseKey, direction: -1 | 1) => void
+  onRequestRunnerOut?: (runner: Runner, source: BaseKey) => void
   runner: Runner
   source: RunnerSource
 }
 
-function RunnerTile({ onDragEnd, onDragStart, onMoveBaseRunner, runner, source }: RunnerTileProps) {
+function RunnerTile({ baseLabel, onDragEnd, onDragStart, onRequestRunnerOut, runner, source }: RunnerTileProps) {
   const isBaseRunner = source !== 'atBat'
+  const [isConfirmingOut, setIsConfirmingOut] = useState(false)
+
+  function handleDragStart(event: DragEvent<HTMLButtonElement>) {
+    const runnerTile = event.currentTarget.closest('.score-runner-tile')
+    if (runnerTile instanceof HTMLElement) {
+      const tileRect = runnerTile.getBoundingClientRect()
+      const handleRect = event.currentTarget.getBoundingClientRect()
+      const offsetX = handleRect.left - tileRect.left + handleRect.width / 2
+      const offsetY = handleRect.top - tileRect.top + handleRect.height / 2
+
+      event.dataTransfer.setDragImage(runnerTile, offsetX, offsetY)
+    }
+
+    event.dataTransfer.effectAllowed = 'move'
+    onDragStart?.(source)
+  }
 
   return (
     <div
-      className={isBaseRunner ? 'score-runner-tile' : 'score-runner-tile at-bat-runner-tile'}
-      draggable={isBaseRunner}
-      onDragEnd={onDragEnd}
-      onDragStart={() => onDragStart?.(source)}
+      className={isBaseRunner ? `score-runner-tile${isConfirmingOut ? ' confirming-out' : ''}` : 'score-runner-tile at-bat-runner-tile'}
     >
-      {isBaseRunner && (
-        <button type="button" aria-label={`Move ${runner.name} back`} onClick={() => onMoveBaseRunner?.(source, -1)}>
-          <svg viewBox="0 0 16 16" aria-hidden="true">
-            <path d="m10 4-4 4 4 4" />
-          </svg>
-        </button>
+      {isBaseRunner && isConfirmingOut && (
+        <div className="runner-out-confirm">
+          <span>Is this runner out?</span>
+          <div>
+            <button type="button" aria-label="Cancel runner out" onClick={() => setIsConfirmingOut(false)}>
+              <svg viewBox="0 0 16 16" aria-hidden="true">
+                <path d="m4.5 4.5 7 7M11.5 4.5l-7 7" />
+              </svg>
+            </button>
+            <button type="button" aria-label="Confirm runner out" onClick={() => onRequestRunnerOut?.(runner, source as BaseKey)}>
+              <svg viewBox="0 0 16 16" aria-hidden="true">
+                <path d="m4 8.25 2.25 2.25L12 5" />
+              </svg>
+            </button>
+          </div>
+        </div>
       )}
-      <span>{runner.name}</span>
-      {isBaseRunner && (
-        <button type="button" aria-label={`Move ${runner.name} forward`} onClick={() => onMoveBaseRunner?.(source, 1)}>
-          <svg viewBox="0 0 16 16" aria-hidden="true">
-            <path d="m6 4 4 4-4 4" />
-          </svg>
-        </button>
+      {isBaseRunner && baseLabel && !isConfirmingOut && (
+        <>
+          <button className="runner-drag-handle" type="button" aria-label={`Drag ${runner.name}`} draggable onDragEnd={onDragEnd} onDragStart={handleDragStart}>
+            <svg viewBox="0 0 16 16" aria-hidden="true">
+              <circle cx="5.5" cy="4" r="1" />
+              <circle cx="10.5" cy="4" r="1" />
+              <circle cx="5.5" cy="8" r="1" />
+              <circle cx="10.5" cy="8" r="1" />
+              <circle cx="5.5" cy="12" r="1" />
+              <circle cx="10.5" cy="12" r="1" />
+            </svg>
+          </button>
+          <span className="runner-base-label">{baseLabel}</span>
+          <span className="runner-name">{runner.name}</span>
+          <button className="runner-out-button" type="button" aria-label={`Mark ${runner.name} out`} onClick={() => setIsConfirmingOut(true)}>
+            <svg viewBox="0 0 16 16" aria-hidden="true">
+              <path d="m4.5 4.5 7 7M11.5 4.5l-7 7" />
+            </svg>
+          </button>
+        </>
       )}
+      {!isBaseRunner && <span className="runner-name">{runner.name}</span>}
     </div>
   )
 }
@@ -560,13 +798,95 @@ type ScoringActionsProps = {
   onOut: () => void
 }
 
+type GameActionPanelProps = ScoringActionsProps & {
+  batterIndex: number
+  lineup: string[]
+  onManageBattingOrder: () => void
+  teamName: string
+}
+
+function GameActionPanel({ batterIndex, lineup, onHit, onManageBattingOrder, onOut, teamName }: GameActionPanelProps) {
+  const activeLineupIndex = batterIndex % Math.max(lineup.length, 1)
+
+  return (
+    <section className="game-action-panel" aria-label="Batting controls and lineup">
+      <section className="live-lineup-card" aria-label={`${teamName} batting order`}>
+        <div className="live-lineup-heading">
+          <div>
+            <span>Batting Order</span>
+            <strong>{teamName}</strong>
+          </div>
+          <button type="button" aria-label="Manage batting order" onClick={onManageBattingOrder}>
+            <svg viewBox="0 0 20 20" aria-hidden="true">
+              <path d="M4 6h8.25M15.25 6H16" />
+              <path d="M4 10h1.25M8.75 10H16" />
+              <path d="M4 14h6.25M13.75 14H16" />
+              <circle cx="13.75" cy="6" r="1.5" />
+              <circle cx="7.25" cy="10" r="1.5" />
+              <circle cx="12.25" cy="14" r="1.5" />
+            </svg>
+          </button>
+        </div>
+        <div className="live-lineup-list">
+          {lineup.map((player, index) => (
+            <div className={index === activeLineupIndex ? 'live-lineup-row active' : 'live-lineup-row'} key={`${player}-${index}`}>
+              <span>{index + 1}</span>
+              <strong>{player}</strong>
+              {index === activeLineupIndex && <em>Now Batting</em>}
+            </div>
+          ))}
+        </div>
+      </section>
+      <ScoringActions onHit={onHit} onOut={onOut} />
+    </section>
+  )
+}
+
 function ScoringActions({ onHit, onOut }: ScoringActionsProps) {
+  const [isHitMenuOpen, setIsHitMenuOpen] = useState(false)
+  const hitMenuRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!isHitMenuOpen) {
+      return
+    }
+
+    function closeOnOutsideClick(event: PointerEvent) {
+      if (hitMenuRef.current?.contains(event.target as Node)) {
+        return
+      }
+
+      setIsHitMenuOpen(false)
+    }
+
+    document.addEventListener('pointerdown', closeOnOutsideClick)
+    return () => document.removeEventListener('pointerdown', closeOnOutsideClick)
+  }, [isHitMenuOpen])
+
+  function recordHit(baseCount: number) {
+    onHit(baseCount)
+    setIsHitMenuOpen(false)
+  }
+
   return (
     <nav className="scoring-actions" aria-label="Score play">
-      <button type="button" onClick={() => onHit(1)}>Single</button>
-      <button type="button" onClick={() => onHit(2)}>Double</button>
-      <button type="button" onClick={() => onHit(3)}>Triple</button>
-      <button type="button" onClick={() => onHit(4)}>HR</button>
+      <div className="hit-menu-wrap" ref={hitMenuRef}>
+        <button className="hit-toggle-button" type="button" aria-expanded={isHitMenuOpen} onClick={() => setIsHitMenuOpen((isOpen) => !isOpen)}>
+          <span>Hit</span>
+          <svg viewBox="0 0 16 16" aria-hidden="true">
+            <path d="m4 6 4 4 4-4" />
+          </svg>
+        </button>
+        {isHitMenuOpen && (
+          <div className="hit-menu">
+            <button type="button" onClick={() => recordHit(1)}>Single</button>
+            <button type="button" onClick={() => recordHit(2)}>Double</button>
+            <button type="button" onClick={() => recordHit(3)}>Triple</button>
+            <button type="button" onClick={() => recordHit(4)}>HR</button>
+          </div>
+        )}
+      </div>
+      <button type="button" onClick={() => onHit(1)}>Walk</button>
       <button type="button" onClick={onOut}>Out</button>
     </nav>
   )

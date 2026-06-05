@@ -1,4 +1,5 @@
 type ScoreboardProps = {
+  activeBattingTeam: 'home' | 'away'
   homeTeamName: string
   awayTeamName: string
   homeScore: number
@@ -8,15 +9,15 @@ type ScoreboardProps = {
   onEdit: () => void
 }
 
-export function Scoreboard({ homeTeamName, awayTeamName, homeScore, awayScore, inningLabel, outs, onEdit }: ScoreboardProps) {
+export function Scoreboard({ activeBattingTeam, homeTeamName, awayTeamName, homeScore, awayScore, inningLabel, outs, onEdit }: ScoreboardProps) {
   return (
     <header className="score-header">
       <div className="score-teams-row">
-        <div className="team-score">
+        <div className={activeBattingTeam === 'home' ? 'team-score batting' : 'team-score'}>
           <span>{homeTeamName}</span>
           <strong>{homeScore}</strong>
         </div>
-        <div className="team-score muted">
+        <div className={activeBattingTeam === 'away' ? 'team-score batting' : 'team-score'}>
           <span>{awayTeamName}</span>
           <strong>{awayScore}</strong>
         </div>
