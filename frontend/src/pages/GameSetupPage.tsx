@@ -1,12 +1,16 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
-type TeamKey = 'teamOne' | 'teamTwo'
+export type TeamKey = 'teamOne' | 'teamTwo'
 
 export type GameConfig = {
+  homeTeam: TeamKey
+  innings: number
   teamOneName: string
   teamTwoName: string
   teamOnePlayers: string[]
+  teamOneTracksBatting: boolean
   teamTwoPlayers: string[]
+  teamTwoTracksBatting: boolean
 }
 
 type GameSetupPageProps = {
@@ -15,22 +19,50 @@ type GameSetupPageProps = {
 
 const TEAM_NAME_MAX_LENGTH = 45
 export const PLAYER_NAME_MAX_LENGTH = 24
+const GAME_SETUP_STORAGE_KEY = 'scoretap.gameSetupDraft'
+
+type GameSetupDraft = {
+  homeTeam: TeamKey
+  innings: number
+  teamOneDraftPlayer: string
+  teamOneName: string
+  teamOnePlayers: string[]
+  teamOneTracksBatting: boolean
+  teamTwoDraftPlayer: string
+  teamTwoName: string
+  teamTwoPlayers: string[]
+  teamTwoTracksBatting: boolean
+}
+
+const defaultGameSetupDraft: GameSetupDraft = {
+  homeTeam: 'teamOne',
+  innings: 7,
+  teamOneDraftPlayer: '',
+  teamOneName: '',
+  teamOnePlayers: [],
+  teamOneTracksBatting: true,
+  teamTwoDraftPlayer: '',
+  teamTwoName: '',
+  teamTwoPlayers: [],
+  teamTwoTracksBatting: false,
+}
 
 export function GameSetupPage({ onBeginGame }: GameSetupPageProps) {
+  const [setupDraft] = useState<GameSetupDraft>(() => readGameSetupDraft())
   const [trackedBatting, setTrackedBatting] = useState<Record<TeamKey, boolean>>({
-    teamOne: true,
-    teamTwo: false,
+    teamOne: setupDraft.teamOneTracksBatting,
+    teamTwo: setupDraft.teamTwoTracksBatting,
   })
-  const [teamOneName, setTeamOneName] = useState('')
-  const [teamTwoName, setTeamTwoName] = useState('')
-  const [homeTeam, setHomeTeam] = useState<TeamKey>('teamOne')
-  const [innings, setInnings] = useState(7)
-  const [teamOnePlayers, setTeamOnePlayers] = useState<string[]>([])
-  const [teamTwoPlayers, setTeamTwoPlayers] = useState<string[]>([])
+  const [teamOneName, setTeamOneName] = useState(setupDraft.teamOneName)
+  const [teamTwoName, setTeamTwoName] = useState(setupDraft.teamTwoName)
+  const [homeTeam, setHomeTeam] = useState<TeamKey>(setupDraft.homeTeam)
+  const [innings, setInnings] = useState(setupDraft.innings)
+  const [teamOnePlayers, setTeamOnePlayers] = useState<string[]>(setupDraft.teamOnePlayers)
+  const [teamTwoPlayers, setTeamTwoPlayers] = useState<string[]>(setupDraft.teamTwoPlayers)
   const [draggedPlayer, setDraggedPlayer] = useState<{ team: TeamKey; index: number } | null>(null)
   const [dropTarget, setDropTarget] = useState<{ team: TeamKey; index: number } | null>(null)
-  const [teamOneDraftPlayer, setTeamOneDraftPlayer] = useState('')
-  const [teamTwoDraftPlayer, setTeamTwoDraftPlayer] = useState('')
+  const [teamOneDraftPlayer, setTeamOneDraftPlayer] = useState(setupDraft.teamOneDraftPlayer)
+  const [teamTwoDraftPlayer, setTeamTwoDraftPlayer] = useState(setupDraft.teamTwoDraftPlayer)
   const [showMissingLineupNotice, setShowMissingLineupNotice] = useState(false)
 
   const teamOneLabel = teamOneName.trim() || 'Team 1'
@@ -41,6 +73,33 @@ export function GameSetupPage({ onBeginGame }: GameSetupPageProps) {
   const missingTrackedLineups =
     (trackedBatting.teamOne && !teamOneHasLineup) || (trackedBatting.teamTwo && !teamTwoHasLineup)
   const cannotStartGame = hasDuplicateTeamNames
+
+  useEffect(() => {
+    const nextDraft: GameSetupDraft = {
+      homeTeam,
+      innings,
+      teamOneDraftPlayer,
+      teamOneName,
+      teamOnePlayers,
+      teamOneTracksBatting: trackedBatting.teamOne,
+      teamTwoDraftPlayer,
+      teamTwoName,
+      teamTwoPlayers,
+      teamTwoTracksBatting: trackedBatting.teamTwo,
+    }
+
+    localStorage.setItem(GAME_SETUP_STORAGE_KEY, JSON.stringify(nextDraft))
+  }, [
+    homeTeam,
+    innings,
+    teamOneDraftPlayer,
+    teamOneName,
+    teamOnePlayers,
+    teamTwoDraftPlayer,
+    teamTwoName,
+    teamTwoPlayers,
+    trackedBatting,
+  ])
 
   function handleBeginGame() {
     if (missingTrackedLineups) {
@@ -55,11 +114,16 @@ export function GameSetupPage({ onBeginGame }: GameSetupPageProps) {
     setTeamTwoPlayers(finalTeamTwoPlayers)
     setTeamOneDraftPlayer('')
     setTeamTwoDraftPlayer('')
+    localStorage.removeItem(GAME_SETUP_STORAGE_KEY)
     onBeginGame({
+      homeTeam,
+      innings,
       teamOneName: teamOneLabel,
       teamTwoName: teamTwoLabel,
       teamOnePlayers: finalTeamOnePlayers,
+      teamOneTracksBatting: trackedBatting.teamOne,
       teamTwoPlayers: finalTeamTwoPlayers,
+      teamTwoTracksBatting: trackedBatting.teamTwo,
     })
   }
 
@@ -254,6 +318,43 @@ export function GameSetupPage({ onBeginGame }: GameSetupPageProps) {
 
     </section>
   )
+}
+
+function readGameSetupDraft(): GameSetupDraft {
+  try {
+    const rawDraft = localStorage.getItem(GAME_SETUP_STORAGE_KEY)
+    if (!rawDraft) {
+      return defaultGameSetupDraft
+    }
+
+    const parsedDraft = JSON.parse(rawDraft) as Partial<GameSetupDraft>
+    const homeTeam = parsedDraft.homeTeam === 'teamTwo' ? 'teamTwo' : 'teamOne'
+    const innings = typeof parsedDraft.innings === 'number' ? parsedDraft.innings : defaultGameSetupDraft.innings
+
+    return {
+      homeTeam,
+      innings: Math.min(20, Math.max(1, innings)),
+      teamOneDraftPlayer: readString(parsedDraft.teamOneDraftPlayer),
+      teamOneName: readString(parsedDraft.teamOneName).slice(0, TEAM_NAME_MAX_LENGTH),
+      teamOnePlayers: readStringArray(parsedDraft.teamOnePlayers),
+      teamOneTracksBatting: typeof parsedDraft.teamOneTracksBatting === 'boolean' ? parsedDraft.teamOneTracksBatting : true,
+      teamTwoDraftPlayer: readString(parsedDraft.teamTwoDraftPlayer),
+      teamTwoName: readString(parsedDraft.teamTwoName).slice(0, TEAM_NAME_MAX_LENGTH),
+      teamTwoPlayers: readStringArray(parsedDraft.teamTwoPlayers),
+      teamTwoTracksBatting: typeof parsedDraft.teamTwoTracksBatting === 'boolean' ? parsedDraft.teamTwoTracksBatting : false,
+    }
+  } catch {
+    localStorage.removeItem(GAME_SETUP_STORAGE_KEY)
+    return defaultGameSetupDraft
+  }
+}
+
+function readString(value: unknown) {
+  return typeof value === 'string' ? value : ''
+}
+
+function readStringArray(value: unknown) {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : []
 }
 
 type TeamSetupCardProps = {

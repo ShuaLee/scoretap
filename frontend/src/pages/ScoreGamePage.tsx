@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState, type DragEvent } from 'react'
 import { Scoreboard } from '../components/Scoreboard'
-import { PLAYER_NAME_MAX_LENGTH, type GameConfig } from './GameSetupPage'
+import { PLAYER_NAME_MAX_LENGTH, type GameConfig, type TeamKey } from './GameSetupPage'
 
 type ScoreGamePageProps = {
   gameConfig: GameConfig
   initialState?: PersistedGameState
+  onEndGame: () => void
+  onGameConfigChange: (config: GameConfig) => void
   onGameStateChange: (state: PersistedGameState) => void
 }
 
@@ -15,6 +17,7 @@ type RunnerSource = BaseKey | 'atBat'
 type Runner = {
   id: number
   name: string
+  scoredInning?: number
   team: TeamSide
 }
 
@@ -24,6 +27,7 @@ type ScoreModification = {
   home: number
   away: number
 }
+type InningRuns = Record<number, { home: number; away: number }>
 type MovePreview = {
   bases: Bases
   blocked: boolean
@@ -37,6 +41,7 @@ type GameSnapshot = {
   halfInning: 'top' | 'bottom'
   homeBatterIndex: number
   homeScore: number
+  inningRuns: InningRuns
   inning: number
   outs: number
   pendingScorers: Runner[]
@@ -49,6 +54,7 @@ export type PersistedGameState = {
   halfInning: 'top' | 'bottom'
   homeBatterIndex: number
   homeScore: number
+  inningRuns?: InningRuns
   inning: number
   outs: number
   pendingScorers: Runner[]
@@ -65,8 +71,10 @@ const emptyBases: Bases = {
   third: null,
 }
 
-export function ScoreGamePage({ gameConfig, initialState, onGameStateChange }: ScoreGamePageProps) {
+export function ScoreGamePage({ gameConfig, initialState, onEndGame, onGameConfigChange, onGameStateChange }: ScoreGamePageProps) {
   const [isBattingOrderOpen, setIsBattingOrderOpen] = useState(false)
+  const [isEndGameConfirmOpen, setIsEndGameConfirmOpen] = useState(false)
+  const [isFinalScoreOpen, setIsFinalScoreOpen] = useState(false)
   const [isScoreEditorOpen, setIsScoreEditorOpen] = useState(false)
   const [teamOnePlayers, setTeamOnePlayers] = useState(initialState?.teamOnePlayers ?? gameConfig.teamOnePlayers)
   const [teamTwoPlayers, setTeamTwoPlayers] = useState(initialState?.teamTwoPlayers ?? gameConfig.teamTwoPlayers)
@@ -75,6 +83,7 @@ export function ScoreGamePage({ gameConfig, initialState, onGameStateChange }: S
   const [outs, setOuts] = useState(initialState?.outs ?? 0)
   const [homeScore, setHomeScore] = useState(initialState?.homeScore ?? 0)
   const [awayScore, setAwayScore] = useState(initialState?.awayScore ?? 0)
+  const [inningRuns, setInningRuns] = useState<InningRuns>(initialState?.inningRuns ?? {})
   const [homeBatterIndex, setHomeBatterIndex] = useState(initialState?.homeBatterIndex ?? 0)
   const [awayBatterIndex, setAwayBatterIndex] = useState(initialState?.awayBatterIndex ?? 0)
   const [bases, setBases] = useState<Bases>(initialState?.bases ?? emptyBases)
@@ -84,9 +93,13 @@ export function ScoreGamePage({ gameConfig, initialState, onGameStateChange }: S
   const [scoreModification, setScoreModification] = useState<ScoreModification>(initialState?.scoreModification ?? { home: 0, away: 0 })
   const [undoStack, setUndoStack] = useState<GameSnapshot[]>(initialState?.undoStack ?? [])
 
+  const homeTeamKey = gameConfig.homeTeam
+  const awayTeamKey: TeamKey = homeTeamKey === 'teamOne' ? 'teamTwo' : 'teamOne'
   const battingTeam: TeamSide = halfInning === 'top' ? 'away' : 'home'
-  const battingTeamName = battingTeam === 'home' ? gameConfig.teamOneName : gameConfig.teamTwoName
-  const battingLineup = battingTeam === 'home' ? teamOnePlayers : teamTwoPlayers
+  const homeTeamName = getTeamName(homeTeamKey)
+  const awayTeamName = getTeamName(awayTeamKey)
+  const battingTeamName = battingTeam === 'home' ? homeTeamName : awayTeamName
+  const battingLineup = battingTeam === 'home' ? getTeamPlayers(homeTeamKey) : getTeamPlayers(awayTeamKey)
   const batterIndex = battingTeam === 'home' ? homeBatterIndex : awayBatterIndex
   const currentBatterName = battingLineup[batterIndex % Math.max(battingLineup.length, 1)] || `${battingTeamName} Batter`
   const currentBatter: Runner = {
@@ -97,6 +110,48 @@ export function ScoreGamePage({ gameConfig, initialState, onGameStateChange }: S
   const inningLabel = `${halfInning === 'top' ? 'Top' : 'Bottom'} ${formatInning(inning)}`
   const adjustedHomeScore = homeScore + scoreModification.home + Object.values(scoreAdjustments).reduce((total, adjustment) => total + adjustment.home, 0)
   const adjustedAwayScore = awayScore + scoreModification.away + Object.values(scoreAdjustments).reduce((total, adjustment) => total + adjustment.away, 0)
+  const isModalOpen = isScoreEditorOpen || isBattingOrderOpen || isEndGameConfirmOpen || isFinalScoreOpen
+
+  function getTeamName(teamKey: TeamKey) {
+    return teamKey === 'teamOne' ? gameConfig.teamOneName : gameConfig.teamTwoName
+  }
+
+  function getTeamPlayers(teamKey: TeamKey) {
+    return teamKey === 'teamOne' ? teamOnePlayers : teamTwoPlayers
+  }
+
+  function handleEndGame() {
+    setIsEndGameConfirmOpen(true)
+  }
+
+  function confirmEndGame() {
+    setIsEndGameConfirmOpen(false)
+    setIsFinalScoreOpen(false)
+    onEndGame()
+  }
+
+  function extendGame() {
+    onGameConfigChange({ ...gameConfig, innings: gameConfig.innings + 1 })
+    setHalfInning('top')
+    setInning((currentInning) => currentInning + 1)
+    setIsFinalScoreOpen(false)
+  }
+
+  useEffect(() => {
+    if (!isModalOpen) {
+      return
+    }
+
+    const previousBodyOverflow = document.body.style.overflow
+    const previousHtmlOverflow = document.documentElement.style.overflow
+    document.body.style.overflow = 'hidden'
+    document.documentElement.style.overflow = 'hidden'
+
+    return () => {
+      document.body.style.overflow = previousBodyOverflow
+      document.documentElement.style.overflow = previousHtmlOverflow
+    }
+  }, [isModalOpen])
 
   useEffect(() => {
     onGameStateChange({
@@ -106,6 +161,7 @@ export function ScoreGamePage({ gameConfig, initialState, onGameStateChange }: S
       halfInning,
       homeBatterIndex,
       homeScore,
+      inningRuns,
       inning,
       outs,
       pendingScorers,
@@ -122,6 +178,7 @@ export function ScoreGamePage({ gameConfig, initialState, onGameStateChange }: S
     halfInning,
     homeBatterIndex,
     homeScore,
+    inningRuns,
     inning,
     onGameStateChange,
     outs,
@@ -141,6 +198,7 @@ export function ScoreGamePage({ gameConfig, initialState, onGameStateChange }: S
       halfInning,
       homeBatterIndex,
       homeScore,
+      inningRuns,
       inning,
       outs,
       pendingScorers,
@@ -166,6 +224,7 @@ export function ScoreGamePage({ gameConfig, initialState, onGameStateChange }: S
       setHalfInning(snapshot.halfInning)
       setHomeBatterIndex(snapshot.homeBatterIndex)
       setHomeScore(snapshot.homeScore)
+      setInningRuns(snapshot.inningRuns ?? {})
       setInning(snapshot.inning)
       setOuts(snapshot.outs)
       setPendingScorers(snapshot.pendingScorers)
@@ -175,12 +234,30 @@ export function ScoreGamePage({ gameConfig, initialState, onGameStateChange }: S
   }
 
   function scoreRunner(runner: Runner) {
+    const scoringInning = runner.scoredInning ?? inning
+
     if (runner.team === 'home') {
       setHomeScore((score) => score + 1)
+      incrementInningRuns('home', scoringInning)
       return
     }
 
     setAwayScore((score) => score + 1)
+    incrementInningRuns('away', scoringInning)
+  }
+
+  function incrementInningRuns(team: TeamSide, scoringInning: number) {
+    setInningRuns((currentRuns) => {
+      const currentInningRuns = currentRuns[scoringInning] ?? { home: 0, away: 0 }
+
+      return {
+        ...currentRuns,
+        [scoringInning]: {
+          ...currentInningRuns,
+          [team]: currentInningRuns[team] + 1,
+        },
+      }
+    })
   }
 
   function confirmScoredRunner() {
@@ -189,6 +266,7 @@ export function ScoreGamePage({ gameConfig, initialState, onGameStateChange }: S
       return
     }
 
+    saveUndoSnapshot()
     scoreRunner(runner)
     setPendingScorers(remainingRunners)
   }
@@ -226,6 +304,11 @@ export function ScoreGamePage({ gameConfig, initialState, onGameStateChange }: S
 
     if (halfInning === 'top') {
       setHalfInning('bottom')
+      return
+    }
+
+    if (inning >= gameConfig.innings) {
+      setIsFinalScoreOpen(true)
       return
     }
 
@@ -284,7 +367,7 @@ export function ScoreGamePage({ gameConfig, initialState, onGameStateChange }: S
 
       const targetBase = (baseNumber as number) + baseCount
       if (targetBase > 3) {
-        scoringRunners.push(runner)
+        scoringRunners.push(markRunnerScored(runner))
         return
       }
 
@@ -292,7 +375,7 @@ export function ScoreGamePage({ gameConfig, initialState, onGameStateChange }: S
     })
 
     if (baseCount >= 4) {
-      scoringRunners.push(currentBatter)
+      scoringRunners.push(markRunnerScored(currentBatter))
     } else {
       nextBases[baseNumberToKey(baseCount)] = currentBatter
     }
@@ -315,8 +398,15 @@ export function ScoreGamePage({ gameConfig, initialState, onGameStateChange }: S
     setBases(preview.bases)
 
     if (preview.scoringRunner) {
-      const scoringRunner = preview.scoringRunner
+      const scoringRunner = markRunnerScored(preview.scoringRunner)
       setPendingScorers((runners) => [...runners, scoringRunner])
+    }
+  }
+
+  function markRunnerScored(runner: Runner): Runner {
+    return {
+      ...runner,
+      scoredInning: inning,
     }
   }
 
@@ -371,9 +461,9 @@ export function ScoreGamePage({ gameConfig, initialState, onGameStateChange }: S
     <section className="score-game-page" aria-label="Score game">
       <Scoreboard
         activeBattingTeam={battingTeam}
-        awayTeamName={gameConfig.teamTwoName}
+        awayTeamName={awayTeamName}
         awayScore={adjustedAwayScore}
-        homeTeamName={gameConfig.teamOneName}
+        homeTeamName={homeTeamName}
         homeScore={adjustedHomeScore}
         inningLabel={inningLabel}
         outs={outs}
@@ -404,19 +494,46 @@ export function ScoreGamePage({ gameConfig, initialState, onGameStateChange }: S
       />
       {isScoreEditorOpen && (
         <ScoreEditorModal
-          awayTeamName={gameConfig.teamTwoName}
+          awayTeamName={awayTeamName}
           halfInning={halfInning}
-          homeTeamName={gameConfig.teamOneName}
+          homeTeamName={homeTeamName}
+          homeScore={homeScore}
+          inningRuns={inningRuns}
           inning={inning}
+          scheduledInnings={gameConfig.innings}
           outs={outs}
+          awayScore={awayScore}
           scoreAdjustments={scoreAdjustments}
           scoreModification={scoreModification}
           onClose={() => setIsScoreEditorOpen(false)}
+          onEndGame={handleEndGame}
           onHalfInningChange={setHalfInning}
           onInningChange={setInning}
           onOutsChange={setOuts}
+          onScheduledInningsChange={(innings) => onGameConfigChange({ ...gameConfig, innings })}
           onScoreAdjustmentsChange={setScoreAdjustments}
           onScoreModificationChange={setScoreModification}
+        />
+      )}
+      {isEndGameConfirmOpen && (
+        <EndGameConfirmModal
+          awayScore={adjustedAwayScore}
+          awayTeamName={awayTeamName}
+          homeScore={adjustedHomeScore}
+          homeTeamName={homeTeamName}
+          onCancel={() => setIsEndGameConfirmOpen(false)}
+          onConfirm={confirmEndGame}
+        />
+      )}
+      {isFinalScoreOpen && (
+        <FinalScoreModal
+          awayScore={adjustedAwayScore}
+          awayTeamName={awayTeamName}
+          homeScore={adjustedHomeScore}
+          homeTeamName={homeTeamName}
+          onExit={confirmEndGame}
+          onExtend={extendGame}
+          onPlayAgain={confirmEndGame}
         />
       )}
       {isBattingOrderOpen && (
@@ -436,36 +553,57 @@ export function ScoreGamePage({ gameConfig, initialState, onGameStateChange }: S
 
 type ScoreEditorModalProps = {
   awayTeamName: string
+  awayScore: number
   halfInning: 'top' | 'bottom'
   homeTeamName: string
+  homeScore: number
+  inningRuns: InningRuns
   inning: number
   onClose: () => void
+  onEndGame: () => void
   onHalfInningChange: (halfInning: 'top' | 'bottom') => void
   onInningChange: (inning: number) => void
   onOutsChange: (outs: number) => void
+  onScheduledInningsChange: (innings: number) => void
   onScoreAdjustmentsChange: (adjustments: ScoreAdjustments) => void
   onScoreModificationChange: (modification: ScoreModification) => void
   outs: number
+  scheduledInnings: number
   scoreAdjustments: ScoreAdjustments
   scoreModification: ScoreModification
 }
 
 function ScoreEditorModal({
   awayTeamName,
+  awayScore,
   halfInning,
   homeTeamName,
+  homeScore,
+  inningRuns,
   inning,
   onClose,
+  onEndGame,
   onHalfInningChange,
   onInningChange,
   onOutsChange,
+  onScheduledInningsChange,
   onScoreAdjustmentsChange,
   onScoreModificationChange,
   outs,
+  scheduledInnings,
   scoreAdjustments,
   scoreModification,
 }: ScoreEditorModalProps) {
-  const inningRows = Array.from({ length: Math.max(7, inning) }, (_, index) => index + 1)
+  const inningRows = Array.from({ length: Math.max(scheduledInnings, inning) }, (_, index) => index + 1)
+  const inningAdjustmentTotals = Object.values(scoreAdjustments).reduce(
+    (totals, adjustment) => ({
+      away: totals.away + adjustment.away,
+      home: totals.home + adjustment.home,
+    }),
+    { away: 0, home: 0 },
+  )
+  const displayedHomeScore = homeScore + inningAdjustmentTotals.home + scoreModification.home
+  const displayedAwayScore = awayScore + inningAdjustmentTotals.away + scoreModification.away
 
   function updateInningAdjustment(inningNumber: number, team: 'home' | 'away', value: number) {
     onScoreAdjustmentsChange({
@@ -479,72 +617,209 @@ function ScoreEditorModal({
   }
 
   return (
-    <div className="modal-backdrop" role="presentation">
-      <section className="score-editor-modal" role="dialog" aria-modal="true" aria-labelledby="score-editor-title">
-        <button className="modal-close-button" type="button" aria-label="Close score editor" onClick={onClose}>
-          <span aria-hidden="true" />
-        </button>
+    <div className="modal-backdrop" role="presentation" onClick={onClose}>
+      <section className="score-editor-modal" role="dialog" aria-modal="true" aria-labelledby="score-editor-title" onClick={(event) => event.stopPropagation()}>
+        <div className="score-editor-top-actions">
+          <button className="score-editor-game-over-button" type="button" onClick={onEndGame}>
+            Game Over
+          </button>
+          <button className="score-editor-icon-button confirm" type="button" aria-label="Confirm scoreboard changes" onClick={onClose}>
+            <svg viewBox="0 0 16 16" aria-hidden="true">
+              <path d="m4 8.25 2.25 2.25L12 5" />
+            </svg>
+          </button>
+        </div>
         <span className="modal-eyebrow">Scorebook</span>
         <h2 id="score-editor-title">Edit scoreboard</h2>
+
+        <div className="score-editor-section">
+          <h3>Game Settings</h3>
+          <div className="score-editor-grid compact">
+            <label>
+              Innings
+              <NumberStepper
+                ariaLabel="Scheduled innings"
+                max={20}
+                min={1}
+                value={scheduledInnings}
+                onChange={onScheduledInningsChange}
+              />
+            </label>
+          </div>
+        </div>
 
         <div className="score-editor-section">
           <h3>Game Position</h3>
           <div className="score-editor-grid compact">
             <label>
               Inning
-              <input min={1} type="number" value={inning} onChange={(event) => onInningChange(Math.max(1, Number(event.target.value) || 1))} />
+              <NumberStepper ariaLabel="Current inning" min={1} value={inning} onChange={onInningChange} />
             </label>
             <label>
               Half
-              <select value={halfInning} onChange={(event) => onHalfInningChange(event.target.value as 'top' | 'bottom')}>
-                <option value="top">Top</option>
-                <option value="bottom">Bottom</option>
-              </select>
+              <span className="score-editor-select-wrap">
+                <select value={halfInning} onChange={(event) => onHalfInningChange(event.target.value as 'top' | 'bottom')}>
+                  <option value="top">Top</option>
+                  <option value="bottom">Bottom</option>
+                </select>
+              </span>
             </label>
             <label>
               Outs
-              <input min={0} max={2} type="number" value={outs} onChange={(event) => onOutsChange(Math.min(2, Math.max(0, Number(event.target.value) || 0)))} />
+              <NumberStepper ariaLabel="Outs" max={2} min={0} value={outs} onChange={onOutsChange} />
             </label>
           </div>
         </div>
 
         <div className="score-editor-section">
           <h3>Inning Adjustments</h3>
-          <p>Use these for corrections tied to a specific inning.</p>
-          <div className="inning-adjustment-table">
-            <span>Inning</span>
-            <span>{homeTeamName}</span>
-            <span>{awayTeamName}</span>
-            {inningRows.map((inningNumber) => (
-              <div className="inning-adjustment-row" key={inningNumber}>
-                <strong>{inningNumber}</strong>
-                <input type="number" value={scoreAdjustments[inningNumber]?.home ?? 0} onChange={(event) => updateInningAdjustment(inningNumber, 'home', Number(event.target.value) || 0)} />
-                <input type="number" value={scoreAdjustments[inningNumber]?.away ?? 0} onChange={(event) => updateInningAdjustment(inningNumber, 'away', Number(event.target.value) || 0)} />
-              </div>
-            ))}
+          <div className="score-editor-score-summary" aria-label="Current score">
+            <div>
+              <span>{homeTeamName}</span>
+              <strong>{displayedHomeScore}</strong>
+            </div>
+            <div>
+              <span>{awayTeamName}</span>
+              <strong>{displayedAwayScore}</strong>
+            </div>
           </div>
-        </div>
-
-        <div className="score-editor-section">
-          <h3>Modifications</h3>
-          <p>Use these for final score corrections that are not tied to an inning.</p>
-          <div className="score-editor-grid">
-            <label>
-              {homeTeamName}
-              <input type="number" value={scoreModification.home} onChange={(event) => onScoreModificationChange({ ...scoreModification, home: Number(event.target.value) || 0 })} />
-            </label>
-            <label>
-              {awayTeamName}
-              <input type="number" value={scoreModification.away} onChange={(event) => onScoreModificationChange({ ...scoreModification, away: Number(event.target.value) || 0 })} />
-            </label>
+          <div className="inning-adjustment-tables">
+            <InningAdjustmentTable
+              extraRuns={scoreModification.home}
+              inningRows={inningRows}
+              inningRuns={inningRuns}
+              onExtraRunsChange={(runs) => onScoreModificationChange({ ...scoreModification, home: runs })}
+              onUpdateInningAdjustment={updateInningAdjustment}
+              scoreAdjustments={scoreAdjustments}
+              team="home"
+              teamName={homeTeamName}
+            />
+            <InningAdjustmentTable
+              extraRuns={scoreModification.away}
+              inningRows={inningRows}
+              inningRuns={inningRuns}
+              onExtraRunsChange={(runs) => onScoreModificationChange({ ...scoreModification, away: runs })}
+              onUpdateInningAdjustment={updateInningAdjustment}
+              scoreAdjustments={scoreAdjustments}
+              team="away"
+              teamName={awayTeamName}
+            />
           </div>
-        </div>
-        <div className="score-editor-actions">
-          <button type="button" onClick={onClose}>
-            Confirm
-          </button>
         </div>
       </section>
+    </div>
+  )
+}
+
+type InningAdjustmentTableProps = {
+  extraRuns: number
+  inningRows: number[]
+  inningRuns: InningRuns
+  onExtraRunsChange: (runs: number) => void
+  onUpdateInningAdjustment: (inningNumber: number, team: 'home' | 'away', value: number) => void
+  scoreAdjustments: ScoreAdjustments
+  team: 'home' | 'away'
+  teamName: string
+}
+
+function InningAdjustmentTable({
+  extraRuns,
+  inningRows,
+  inningRuns,
+  onExtraRunsChange,
+  onUpdateInningAdjustment,
+  scoreAdjustments,
+  team,
+  teamName,
+}: InningAdjustmentTableProps) {
+  return (
+    <div className="inning-adjustment-table" aria-label={`${teamName} inning adjustments`}>
+      <strong className="inning-adjustment-team-name">{teamName}</strong>
+      <span>Inning</span>
+      <span>Scored</span>
+      <span>Adjust</span>
+      <span>Total</span>
+      {inningRows.map((inningNumber) => {
+        const recordedRuns = inningRuns[inningNumber]?.[team] ?? 0
+        const modifiedRuns = scoreAdjustments[inningNumber]?.[team] ?? 0
+
+        return (
+          <div className="inning-adjustment-row" key={inningNumber}>
+            <strong>{inningNumber}</strong>
+            <span className="inning-run-value" aria-label={`${teamName} inning ${inningNumber} scored runs`}>
+              {recordedRuns}
+            </span>
+            <NumberStepper
+              ariaLabel={`${teamName} inning ${inningNumber} run modifier`}
+              value={modifiedRuns}
+              onChange={(value) => onUpdateInningAdjustment(inningNumber, team, value)}
+            />
+            <span className="inning-run-total" aria-label={`${teamName} inning ${inningNumber} total runs`}>
+              {recordedRuns + modifiedRuns}
+            </span>
+          </div>
+        )
+      })}
+      <div className="inning-adjustment-row final-adjustment-row">
+        <strong>Other</strong>
+        <span className="inning-run-value">0</span>
+        <NumberStepper
+          ariaLabel={`${teamName} other run modifier`}
+          value={extraRuns}
+          onChange={onExtraRunsChange}
+        />
+        <span className="inning-run-total" aria-label={`${teamName} other run total`}>
+          {extraRuns}
+        </span>
+      </div>
+    </div>
+  )
+}
+
+type NumberStepperProps = {
+  ariaLabel: string
+  max?: number
+  min?: number
+  onChange: (value: number) => void
+  value: number
+}
+
+function NumberStepper({ ariaLabel, max, min, onChange, value }: NumberStepperProps) {
+  function clampValue(nextValue: number) {
+    if (typeof min === 'number' && nextValue < min) {
+      return min
+    }
+
+    if (typeof max === 'number' && nextValue > max) {
+      return max
+    }
+
+    return nextValue
+  }
+
+  function updateValue(nextValue: number) {
+    if (Number.isNaN(nextValue)) {
+      return
+    }
+
+    onChange(clampValue(nextValue))
+  }
+
+  return (
+    <div className="number-stepper">
+      <button type="button" aria-label={`Decrease ${ariaLabel}`} onClick={() => updateValue(value - 1)}>
+        -
+      </button>
+      <input
+        aria-label={ariaLabel}
+        inputMode="numeric"
+        type="text"
+        value={value}
+        onChange={(event) => updateValue(Number(event.target.value))}
+      />
+      <button type="button" aria-label={`Increase ${ariaLabel}`} onClick={() => updateValue(value + 1)}>
+        +
+      </button>
     </div>
   )
 }
@@ -793,6 +1068,82 @@ function RunnerTile({ baseLabel, onDragEnd, onDragStart, onRequestRunnerOut, run
   )
 }
 
+type GameDecisionModalProps = {
+  awayScore: number
+  awayTeamName: string
+  homeScore: number
+  homeTeamName: string
+}
+
+type EndGameConfirmModalProps = GameDecisionModalProps & {
+  onCancel: () => void
+  onConfirm: () => void
+}
+
+function EndGameConfirmModal({ awayScore, awayTeamName, homeScore, homeTeamName, onCancel, onConfirm }: EndGameConfirmModalProps) {
+  return (
+    <div className="modal-backdrop" role="presentation" onClick={onCancel}>
+      <section className="game-decision-modal" role="dialog" aria-modal="true" aria-labelledby="end-game-title" onClick={(event) => event.stopPropagation()}>
+        <span className="modal-eyebrow">Game Over</span>
+        <h2 id="end-game-title">Confirm game over?</h2>
+        <ScoreSummary awayScore={awayScore} awayTeamName={awayTeamName} homeScore={homeScore} homeTeamName={homeTeamName} />
+        <div className="game-decision-actions">
+          <button className="secondary" type="button" onClick={onCancel}>
+            Keep Playing
+          </button>
+          <button className="secondary" type="button" onClick={onConfirm}>
+            Exit Game
+          </button>
+        </div>
+      </section>
+    </div>
+  )
+}
+
+type FinalScoreModalProps = GameDecisionModalProps & {
+  onExit: () => void
+  onExtend: () => void
+  onPlayAgain: () => void
+}
+
+function FinalScoreModal({ awayScore, awayTeamName, homeScore, homeTeamName, onExit, onExtend, onPlayAgain }: FinalScoreModalProps) {
+  return (
+    <div className="modal-backdrop" role="presentation">
+      <section className="game-decision-modal" role="dialog" aria-modal="true" aria-labelledby="final-score-title">
+        <span className="modal-eyebrow">Final Score</span>
+        <h2 id="final-score-title">Game complete</h2>
+        <ScoreSummary awayScore={awayScore} awayTeamName={awayTeamName} homeScore={homeScore} homeTeamName={homeTeamName} />
+        <div className="game-decision-actions stacked">
+          <button className="primary" type="button" onClick={onExtend}>
+            Extend Innings
+          </button>
+          <button className="secondary" type="button" onClick={onPlayAgain}>
+            Play Again
+          </button>
+          <button className="secondary" type="button" onClick={onExit}>
+            Exit to Main Menu
+          </button>
+        </div>
+      </section>
+    </div>
+  )
+}
+
+function ScoreSummary({ awayScore, awayTeamName, homeScore, homeTeamName }: GameDecisionModalProps) {
+  return (
+    <div className="game-decision-score" aria-label="Score">
+      <div>
+        <span>{homeTeamName}</span>
+        <strong>{homeScore}</strong>
+      </div>
+      <div>
+        <span>{awayTeamName}</span>
+        <strong>{awayScore}</strong>
+      </div>
+    </div>
+  )
+}
+
 type ScoringActionsProps = {
   onHit: (baseCount: number) => void
   onOut: () => void
@@ -806,14 +1157,42 @@ type GameActionPanelProps = ScoringActionsProps & {
 }
 
 function GameActionPanel({ batterIndex, lineup, onHit, onManageBattingOrder, onOut, teamName }: GameActionPanelProps) {
+  const [isBattingOrderPreviewOpen, setIsBattingOrderPreviewOpen] = useState(false)
+  const battingOrderPreviewRef = useRef<HTMLDivElement>(null)
   const activeLineupIndex = batterIndex % Math.max(lineup.length, 1)
+  const currentBatter = lineup[activeLineupIndex] || `${teamName} Batter`
+  const fullLineup = lineup.length ? lineup : [currentBatter]
+  const nextBatter = lineup.length > 1 ? lineup[(activeLineupIndex + 1) % lineup.length] : 'Lineup wraps here'
+  const upcomingLineup = lineup.length
+    ? [...lineup.slice(activeLineupIndex + 1), ...lineup.slice(0, activeLineupIndex)].map((player, visibleIndex) => ({
+        originalIndex: (activeLineupIndex + 1 + visibleIndex) % lineup.length,
+        player,
+      }))
+    : []
+
+  useEffect(() => {
+    if (!isBattingOrderPreviewOpen) {
+      return
+    }
+
+    function closeOnOutsideClick(event: PointerEvent) {
+      if (battingOrderPreviewRef.current?.contains(event.target as Node)) {
+        return
+      }
+
+      setIsBattingOrderPreviewOpen(false)
+    }
+
+    document.addEventListener('pointerdown', closeOnOutsideClick)
+    return () => document.removeEventListener('pointerdown', closeOnOutsideClick)
+  }, [isBattingOrderPreviewOpen])
 
   return (
     <section className="game-action-panel" aria-label="Batting controls and lineup">
       <section className="live-lineup-card" aria-label={`${teamName} batting order`}>
         <div className="live-lineup-heading">
           <div>
-            <span>Batting Order</span>
+            <span>Up Next</span>
             <strong>{teamName}</strong>
           </div>
           <button type="button" aria-label="Manage batting order" onClick={onManageBattingOrder}>
@@ -828,21 +1207,48 @@ function GameActionPanel({ batterIndex, lineup, onHit, onManageBattingOrder, onO
           </button>
         </div>
         <div className="live-lineup-list">
-          {lineup.map((player, index) => (
-            <div className={index === activeLineupIndex ? 'live-lineup-row active' : 'live-lineup-row'} key={`${player}-${index}`}>
-              <span>{index + 1}</span>
+          {upcomingLineup.map(({ originalIndex, player }) => (
+            <div className="live-lineup-row" key={`${player}-${originalIndex}`}>
+              <span>{originalIndex + 1}</span>
               <strong>{player}</strong>
-              {index === activeLineupIndex && <em>Now Batting</em>}
             </div>
           ))}
         </div>
       </section>
-      <ScoringActions onHit={onHit} onOut={onOut} />
+      <section className="floating-batter-card" aria-label={`${currentBatter} at bat`}>
+        <div className="floating-batter-top">
+          <div>
+            <span>{teamName}</span>
+            <em>Now Batting</em>
+            <strong>{currentBatter}</strong>
+            <small>Up Next: {nextBatter}</small>
+          </div>
+          <div className="floating-batting-order-wrap" ref={battingOrderPreviewRef}>
+            <button className="floating-batting-order-button" type="button" aria-expanded={isBattingOrderPreviewOpen} onClick={() => setIsBattingOrderPreviewOpen((isOpen) => !isOpen)}>
+              <span>Batting Order</span>
+              <svg viewBox="0 0 16 16" aria-hidden="true">
+                <path d="m4 10 4-4 4 4" />
+              </svg>
+            </button>
+            {isBattingOrderPreviewOpen && (
+              <div className="floating-batting-order-popover">
+                {fullLineup.map((player, index) => (
+                  <div className={index === activeLineupIndex ? 'current' : ''} key={`${player}-${index}`}>
+                    <span>{index + 1}</span>
+                    <strong>{player}</strong>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+        <BatterActionControls onHit={onHit} onOut={onOut} />
+      </section>
     </section>
   )
 }
 
-function ScoringActions({ onHit, onOut }: ScoringActionsProps) {
+function BatterActionControls({ onHit, onOut }: ScoringActionsProps) {
   const [isHitMenuOpen, setIsHitMenuOpen] = useState(false)
   const hitMenuRef = useRef<HTMLDivElement>(null)
 
@@ -869,7 +1275,7 @@ function ScoringActions({ onHit, onOut }: ScoringActionsProps) {
   }
 
   return (
-    <nav className="scoring-actions" aria-label="Score play">
+    <div className="active-batter-actions" aria-label="Score play">
       <div className="hit-menu-wrap" ref={hitMenuRef}>
         <button className="hit-toggle-button" type="button" aria-expanded={isHitMenuOpen} onClick={() => setIsHitMenuOpen((isOpen) => !isOpen)}>
           <span>Hit</span>
@@ -888,7 +1294,7 @@ function ScoringActions({ onHit, onOut }: ScoringActionsProps) {
       </div>
       <button type="button" onClick={() => onHit(1)}>Walk</button>
       <button type="button" onClick={onOut}>Out</button>
-    </nav>
+    </div>
   )
 }
 
