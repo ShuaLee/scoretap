@@ -19,6 +19,7 @@ type GameSetupPageProps = {
 
 const TEAM_NAME_MAX_LENGTH = 45
 export const PLAYER_NAME_MAX_LENGTH = 24
+export const MIN_TRACKED_LINEUP_PLAYERS = 4
 const GAME_SETUP_STORAGE_KEY = 'scoretap.gameSetupDraft'
 
 type GameSetupDraft = {
@@ -68,10 +69,11 @@ export function GameSetupPage({ onBeginGame }: GameSetupPageProps) {
   const teamOneLabel = teamOneName.trim() || 'Team 1'
   const teamTwoLabel = teamTwoName.trim() || 'Team 2'
   const hasDuplicateTeamNames = teamOneLabel.toLowerCase() === teamTwoLabel.toLowerCase()
-  const teamOneHasLineup = teamOnePlayers.some((player) => player.trim())
-  const teamTwoHasLineup = teamTwoPlayers.some((player) => player.trim())
+  const teamOneLineupCount = teamOnePlayers.filter((player) => player.trim()).length
+  const teamTwoLineupCount = teamTwoPlayers.filter((player) => player.trim()).length
   const missingTrackedLineups =
-    (trackedBatting.teamOne && !teamOneHasLineup) || (trackedBatting.teamTwo && !teamTwoHasLineup)
+    (trackedBatting.teamOne && teamOneLineupCount < MIN_TRACKED_LINEUP_PLAYERS) ||
+    (trackedBatting.teamTwo && teamTwoLineupCount < MIN_TRACKED_LINEUP_PLAYERS)
   const cannotStartGame = hasDuplicateTeamNames
 
   useEffect(() => {
@@ -268,7 +270,7 @@ export function GameSetupPage({ onBeginGame }: GameSetupPageProps) {
 
       {hasDuplicateTeamNames && <p className="setup-error">Team names must be different.</p>}
       {showMissingLineupNotice && missingTrackedLineups && (
-        <p className="setup-notice">Add at least one player for each team set to At-Bats & Runs.</p>
+        <p className="setup-notice">Add at least {MIN_TRACKED_LINEUP_PLAYERS} batters for each team set to At-Bats & Runs.</p>
       )}
 
       <div className="create-game-actions">
