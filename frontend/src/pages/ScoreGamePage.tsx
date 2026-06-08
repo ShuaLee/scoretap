@@ -102,7 +102,9 @@ export function ScoreGamePage({ gameConfig, initialState, onEndGame, onGameConfi
   const battingTeamName = battingTeam === 'home' ? homeTeamName : awayTeamName
   const battingLineup = battingTeam === 'home' ? getTeamPlayers(homeTeamKey) : getTeamPlayers(awayTeamKey)
   const batterIndex = battingTeam === 'home' ? homeBatterIndex : awayBatterIndex
-  const currentBatterName = battingLineup[batterIndex % Math.max(battingLineup.length, 1)] || `${battingTeamName} Batter`
+  const currentBatterLineupIndex = batterIndex % Math.max(battingLineup.length, 1)
+  const currentBatterName = battingLineup[currentBatterLineupIndex] || `${battingTeamName} Batter`
+  const currentBatterOrderNumber = battingLineup.length ? currentBatterLineupIndex + 1 : null
   const currentBatter: Runner = {
     id: Number(`${battingTeam === 'home' ? 1 : 2}${inning}${batterIndex}`),
     name: currentBatterName,
@@ -498,13 +500,20 @@ export function ScoreGamePage({ gameConfig, initialState, onEndGame, onGameConfi
         onEdit={() => setIsScoreEditorOpen(true)}
       />
       <BaseOccupancy
+        activeTeamName={battingTeamName}
         bases={bases}
         canUndo={undoStack.length > 0}
+        currentBatterName={currentBatterName}
+        currentBatterOrderNumber={currentBatterOrderNumber}
         draggedRunnerSource={draggedRunnerSource}
+        isBattingTracked={getTeamTracksBatting(battingTeamKey)}
+        onActivateBattingTracking={() => activateTeamBattingTracking(battingTeamKey)}
         onDragEnd={() => setDraggedRunnerSource(null)}
         onDragStart={setDraggedRunnerSource}
         onGetMovePreview={getMovePreview}
+        onHit={recordHit}
         onMoveRunner={moveRunner}
+        onOut={recordOut}
         onRequestRunnerOut={(_, source) => recordBaseRunnerOut(source)}
         onReturnRunnerToThird={returnPendingScorerToThird}
         pendingScorer={pendingScorers[0] ?? null}
@@ -517,11 +526,7 @@ export function ScoreGamePage({ gameConfig, initialState, onEndGame, onGameConfi
         getBatterIndex={getTeamBatterIndex}
         getLineup={getTeamPlayers}
         getTeamTracksBatting={getTeamTracksBatting}
-        inningLabel={inningLabel}
-        onHit={recordHit}
-        onActivateBattingTracking={activateTeamBattingTracking}
         onManageRoster={() => setIsRosterSettingsOpen(true)}
-        onOut={recordOut}
         teams={[
           { key: 'teamOne', name: gameConfig.teamOneName },
           { key: 'teamTwo', name: gameConfig.teamTwoName },
@@ -862,14 +867,21 @@ function NumberStepper({ ariaLabel, max, min, onChange, value }: NumberStepperPr
 }
 
 type BaseOccupancyProps = {
+  activeTeamName: string
   bases: Bases
   canUndo: boolean
+  currentBatterName: string
+  currentBatterOrderNumber: number | null
   draggedRunnerSource: RunnerSource | null
+  isBattingTracked: boolean
+  onActivateBattingTracking: () => void
   onConfirmRun: () => void
   onDragEnd: () => void
   onGetMovePreview: (source: RunnerSource, target: RunnerSource) => MovePreview
   onDragStart: (source: RunnerSource) => void
+  onHit: (baseCount: number) => void
   onMoveRunner: (source: RunnerSource, target: RunnerSource) => void
+  onOut: () => void
   onRequestRunnerOut: (runner: Runner, source: BaseKey) => void
   onReturnRunnerToThird: () => void
   onUndo: () => void
@@ -878,14 +890,21 @@ type BaseOccupancyProps = {
 }
 
 function BaseOccupancy({
+  activeTeamName,
   bases,
   canUndo,
+  currentBatterName,
+  currentBatterOrderNumber,
   draggedRunnerSource,
+  isBattingTracked,
+  onActivateBattingTracking,
   onConfirmRun,
   onDragEnd,
   onGetMovePreview,
   onDragStart,
+  onHit,
   onMoveRunner,
+  onOut,
   onRequestRunnerOut,
   onReturnRunnerToThird,
   onUndo,
@@ -919,8 +938,47 @@ function BaseOccupancy({
         <BaseSlot baseKey="second" className="base-slot-2b" dragPreviewTarget={dragPreviewTarget} isPreviewBlocked={Boolean(movePreview?.blocked && dragPreviewTarget === 'second')} label="2B" runner={previewBases.second} draggedRunnerSource={draggedRunnerSource} onDragEnd={handleDragEnd} onDragStart={onDragStart} onMoveRunner={handleMoveRunner} onPreviewTargetChange={setDragPreviewTarget} onRequestRunnerOut={onRequestRunnerOut} />
         <BaseSlot baseKey="first" className="base-slot-1b" dragPreviewTarget={dragPreviewTarget} isPreviewBlocked={Boolean(movePreview?.blocked && dragPreviewTarget === 'first')} label="1B" runner={previewBases.first} draggedRunnerSource={draggedRunnerSource} onDragEnd={handleDragEnd} onDragStart={onDragStart} onMoveRunner={handleMoveRunner} onPreviewTargetChange={setDragPreviewTarget} onRequestRunnerOut={onRequestRunnerOut} />
         <HomeScoringSlot pendingScorer={pendingScorer} pendingScorerCount={pendingScorerCount} onConfirmRun={onConfirmRun} onReturnRunnerToThird={onReturnRunnerToThird} />
+        <FieldAtBatCard
+          activeTeamName={activeTeamName}
+          currentBatterName={currentBatterName}
+          currentBatterOrderNumber={currentBatterOrderNumber}
+          isBattingTracked={isBattingTracked}
+          onActivateBattingTracking={onActivateBattingTracking}
+          onHit={onHit}
+          onOut={onOut}
+        />
       </section>
     </div>
+  )
+}
+
+type FieldAtBatCardProps = ScoringActionsProps & {
+  activeTeamName: string
+  currentBatterName: string
+  currentBatterOrderNumber: number | null
+  isBattingTracked: boolean
+  onActivateBattingTracking: () => void
+}
+
+function FieldAtBatCard({ activeTeamName, currentBatterName, currentBatterOrderNumber, isBattingTracked, onActivateBattingTracking, onHit, onOut }: FieldAtBatCardProps) {
+  return (
+    <section className={isBattingTracked ? 'field-at-bat-card' : 'field-at-bat-card tracking-disabled'} aria-label={`${currentBatterName} at bat`}>
+      <div className="field-at-bat-team">
+        <span>{activeTeamName} Batting</span>
+      </div>
+      <div className="field-at-bat-row">
+        <div className="field-at-bat-copy">
+          {isBattingTracked && currentBatterOrderNumber && <em>{currentBatterOrderNumber}</em>}
+          <strong>{isBattingTracked ? currentBatterName : 'Tracking off'}</strong>
+        </div>
+        {isBattingTracked && <BatterActionControls onHit={onHit} onOut={onOut} />}
+        {!isBattingTracked && (
+          <button className="activate-batting-button" type="button" onClick={onActivateBattingTracking}>
+            Activate
+          </button>
+        )}
+      </div>
+    </section>
   )
 }
 
@@ -1187,13 +1245,11 @@ type ScoringActionsProps = {
   onOut: () => void
 }
 
-type GameActionPanelProps = ScoringActionsProps & {
+type GameActionPanelProps = {
   activeTeamKey: TeamKey
   getBatterIndex: (teamKey: TeamKey) => number
   getLineup: (teamKey: TeamKey) => string[]
   getTeamTracksBatting: (teamKey: TeamKey) => boolean
-  inningLabel: string
-  onActivateBattingTracking: (teamKey: TeamKey) => void
   onManageRoster: () => void
   teams: Array<{ key: TeamKey; name: string }>
 }
@@ -1203,11 +1259,7 @@ function GameActionPanel({
   getBatterIndex,
   getLineup,
   getTeamTracksBatting,
-  inningLabel,
-  onActivateBattingTracking,
-  onHit,
   onManageRoster,
-  onOut,
   teams,
 }: GameActionPanelProps) {
   const activeTeam = teams.find((team) => team.key === activeTeamKey) ?? teams[0]
@@ -1230,7 +1282,6 @@ function GameActionPanel({
           <div className="batter-order-panel">
             <div className="batter-order-heading">
               <div>
-                <span>{activeTeam.name} Batting</span>
                 <strong>Batting Order</strong>
               </div>
               <button className="roster-settings-button" type="button" aria-label="Manage rosters" onClick={onManageRoster}>
@@ -1260,28 +1311,6 @@ function GameActionPanel({
                 </div>
               )}
             </div>
-          </div>
-          <div className="batter-current-panel">
-            {tracksBatting && (
-              <div className="batter-player-card current">
-                <div>
-                  <span>Now Batting</span>
-                  <strong>{currentBatter}</strong>
-                </div>
-                <BatterActionControls onHit={onHit} onOut={onOut} />
-              </div>
-            )}
-            {!tracksBatting && (
-              <div className="batting-unavailable">
-                <strong>Tracking off</strong>
-                <small>Activate to manage this lineup.</small>
-              </div>
-            )}
-            {!tracksBatting && (
-              <button className="activate-batting-button" type="button" onClick={() => onActivateBattingTracking(activeTeam.key)}>
-                Activate
-              </button>
-            )}
           </div>
         </div>
       </section>

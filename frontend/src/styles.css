@@ -1747,9 +1747,9 @@ body {
   display: grid;
   grid-column: 1 / -1;
   grid-template-columns: repeat(12, minmax(0, 1fr));
-  grid-template-rows: 86px 86px 86px;
+  grid-template-rows: 86px 86px 86px auto;
   column-gap: 6px;
-  row-gap: 10px;
+  row-gap: 12px;
   width: 100%;
   border: 1px solid var(--color-border);
   border-radius: 16px;
@@ -2195,6 +2195,82 @@ body {
   transform: translateX(-10%);
 }
 
+.field-at-bat-card {
+  display: grid;
+  grid-column: 2 / 12;
+  grid-row: 4;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+  min-width: 0;
+  border: 2px solid var(--color-primary);
+  border-radius: 12px;
+  background: rgba(var(--color-primary-rgb), 0.12);
+  color: var(--color-dark-green);
+  padding: 10px;
+}
+
+.field-at-bat-card.tracking-disabled {
+  border-color: rgba(var(--color-primary-rgb), 0.28);
+  background: #f8fafc;
+}
+
+.field-at-bat-team {
+  min-width: 0;
+}
+
+.field-at-bat-team span {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-muted);
+  font-size: 11px;
+  font-weight: 850;
+  letter-spacing: 0.06em;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.field-at-bat-row {
+  display: grid;
+  grid-template-columns: minmax(0, 0.78fr) minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.field-at-bat-copy {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.field-at-bat-copy em {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  background: #ffffff;
+  color: var(--color-primary);
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 850;
+}
+
+.field-at-bat-copy strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-dark-green);
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.15;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .game-action-panel {
   display: grid;
   grid-template-columns: 1fr;
@@ -2214,7 +2290,7 @@ body {
 .hit-menu-wrap > button {
   min-height: 44px;
   border: 1px solid rgba(var(--color-primary-rgb), 0.4);
-  border-radius: 12px;
+  border-radius: 999px;
   background: #ffffff;
   color: var(--color-dark-green);
   font: inherit;
@@ -2438,7 +2514,7 @@ body {
 
 .batter-card-main {
   display: grid;
-  grid-template-columns: minmax(0, 0.9fr) minmax(220px, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   align-items: stretch;
   gap: 12px;
   min-width: 0;
@@ -2482,8 +2558,7 @@ body {
   background: rgba(var(--color-primary-rgb), 0.1);
 }
 
-.batter-order-panel,
-.batter-current-panel {
+.batter-order-panel {
   display: grid;
   gap: 8px;
   align-content: start;
@@ -2503,9 +2578,9 @@ body {
   align-items: center;
   gap: 10px;
   justify-content: space-between;
-  border-bottom: 1px solid rgba(18, 56, 44, 0.09);
+  border-bottom: 0;
   background: transparent;
-  padding: 2px 0 9px;
+  padding: 0 0 5px;
 }
 
 .batter-order-heading > div {
@@ -2622,8 +2697,8 @@ body {
 .batter-player-card {
   position: relative;
   display: grid;
-  grid-template-columns: 1fr;
-  align-content: stretch;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1fr);
+  align-items: center;
   gap: 12px;
   height: 100%;
   min-width: 0;
@@ -2631,7 +2706,7 @@ body {
   border: 2px solid var(--color-primary);
   border-radius: 12px;
   background: rgba(var(--color-primary-rgb), 0.12);
-  padding: 12px;
+  padding: 10px;
   box-shadow: none;
 }
 
@@ -3653,9 +3728,9 @@ body {
 
   .base-occupancy-card {
     grid-template-columns: repeat(12, minmax(0, 1fr));
-    grid-template-rows: 86px 86px 86px;
+    grid-template-rows: 86px 86px 86px auto;
     column-gap: 6px;
-    row-gap: 10px;
+    row-gap: 12px;
     padding: 12px 8px;
   }
 
@@ -3677,6 +3752,10 @@ body {
   .base-slot-home {
     grid-column: 5 / 10;
     transform: translateX(-10%);
+  }
+
+  .field-at-bat-card {
+    grid-column: 1 / -1;
   }
 
   .base-slot {
@@ -3813,6 +3892,10 @@ body {
 
   .active-batter-actions {
     gap: 6px;
+  }
+
+  .field-at-bat-row {
+    grid-template-columns: 1fr;
   }
 
   .batter-player-card {
