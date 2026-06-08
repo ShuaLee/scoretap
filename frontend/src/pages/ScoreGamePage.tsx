@@ -72,9 +72,9 @@ const emptyBases: Bases = {
 }
 
 export function ScoreGamePage({ gameConfig, initialState, onEndGame, onGameConfigChange, onGameStateChange }: ScoreGamePageProps) {
-  const [isBattingOrderOpen, setIsBattingOrderOpen] = useState(false)
   const [isEndGameConfirmOpen, setIsEndGameConfirmOpen] = useState(false)
   const [isFinalScoreOpen, setIsFinalScoreOpen] = useState(false)
+  const [isRosterSettingsOpen, setIsRosterSettingsOpen] = useState(false)
   const [isScoreEditorOpen, setIsScoreEditorOpen] = useState(false)
   const [teamOnePlayers, setTeamOnePlayers] = useState(initialState?.teamOnePlayers ?? gameConfig.teamOnePlayers)
   const [teamTwoPlayers, setTeamTwoPlayers] = useState(initialState?.teamTwoPlayers ?? gameConfig.teamTwoPlayers)
@@ -96,6 +96,7 @@ export function ScoreGamePage({ gameConfig, initialState, onEndGame, onGameConfi
   const homeTeamKey = gameConfig.homeTeam
   const awayTeamKey: TeamKey = homeTeamKey === 'teamOne' ? 'teamTwo' : 'teamOne'
   const battingTeam: TeamSide = halfInning === 'top' ? 'away' : 'home'
+  const battingTeamKey = battingTeam === 'home' ? homeTeamKey : awayTeamKey
   const homeTeamName = getTeamName(homeTeamKey)
   const awayTeamName = getTeamName(awayTeamKey)
   const battingTeamName = battingTeam === 'home' ? homeTeamName : awayTeamName
@@ -110,7 +111,7 @@ export function ScoreGamePage({ gameConfig, initialState, onEndGame, onGameConfi
   const inningLabel = `${halfInning === 'top' ? 'Top' : 'Bottom'} ${formatInning(inning)}`
   const adjustedHomeScore = homeScore + scoreModification.home + Object.values(scoreAdjustments).reduce((total, adjustment) => total + adjustment.home, 0)
   const adjustedAwayScore = awayScore + scoreModification.away + Object.values(scoreAdjustments).reduce((total, adjustment) => total + adjustment.away, 0)
-  const isModalOpen = isScoreEditorOpen || isBattingOrderOpen || isEndGameConfirmOpen || isFinalScoreOpen
+  const isModalOpen = isScoreEditorOpen || isRosterSettingsOpen || isEndGameConfirmOpen || isFinalScoreOpen
 
   function getTeamName(teamKey: TeamKey) {
     return teamKey === 'teamOne' ? gameConfig.teamOneName : gameConfig.teamTwoName
@@ -118,6 +119,33 @@ export function ScoreGamePage({ gameConfig, initialState, onEndGame, onGameConfi
 
   function getTeamPlayers(teamKey: TeamKey) {
     return teamKey === 'teamOne' ? teamOnePlayers : teamTwoPlayers
+  }
+
+  function getTeamTracksBatting(teamKey: TeamKey) {
+    return teamKey === 'teamOne' ? gameConfig.teamOneTracksBatting : gameConfig.teamTwoTracksBatting
+  }
+
+  function getTeamBatterIndex(teamKey: TeamKey) {
+    return teamKey === homeTeamKey ? homeBatterIndex : awayBatterIndex
+  }
+
+  function updateTeamPlayers(teamKey: TeamKey, players: string[]) {
+    if (teamKey === 'teamOne') {
+      setTeamOnePlayers(players)
+      onGameConfigChange({ ...gameConfig, teamOnePlayers: players })
+      return
+    }
+
+    setTeamTwoPlayers(players)
+    onGameConfigChange({ ...gameConfig, teamTwoPlayers: players })
+  }
+
+  function activateTeamBattingTracking(teamKey: TeamKey) {
+    onGameConfigChange({
+      ...gameConfig,
+      teamOneTracksBatting: teamKey === 'teamOne' ? true : gameConfig.teamOneTracksBatting,
+      teamTwoTracksBatting: teamKey === 'teamTwo' ? true : gameConfig.teamTwoTracksBatting,
+    })
   }
 
   function handleEndGame() {
@@ -485,12 +513,19 @@ export function ScoreGamePage({ gameConfig, initialState, onEndGame, onGameConfi
         onUndo={undoLastScoringAction}
       />
       <GameActionPanel
-        batterIndex={batterIndex}
-        lineup={battingLineup}
+        activeTeamKey={battingTeamKey}
+        getBatterIndex={getTeamBatterIndex}
+        getLineup={getTeamPlayers}
+        getTeamTracksBatting={getTeamTracksBatting}
+        inningLabel={inningLabel}
         onHit={recordHit}
-        onManageBattingOrder={() => setIsBattingOrderOpen(true)}
+        onActivateBattingTracking={activateTeamBattingTracking}
+        onManageRoster={() => setIsRosterSettingsOpen(true)}
         onOut={recordOut}
-        teamName={battingTeamName}
+        teams={[
+          { key: 'teamOne', name: gameConfig.teamOneName },
+          { key: 'teamTwo', name: gameConfig.teamTwoName },
+        ]}
       />
       {isScoreEditorOpen && (
         <ScoreEditorModal
@@ -515,6 +550,19 @@ export function ScoreGamePage({ gameConfig, initialState, onEndGame, onGameConfi
           onScoreModificationChange={setScoreModification}
         />
       )}
+      {isRosterSettingsOpen && (
+        <RosterSettingsModal
+          getLineup={getTeamPlayers}
+          getTeamTracksBatting={getTeamTracksBatting}
+          onActivateBattingTracking={activateTeamBattingTracking}
+          onClose={() => setIsRosterSettingsOpen(false)}
+          onTeamPlayersChange={updateTeamPlayers}
+          teams={[
+            { key: 'teamOne', name: gameConfig.teamOneName },
+            { key: 'teamTwo', name: gameConfig.teamTwoName },
+          ]}
+        />
+      )}
       {isEndGameConfirmOpen && (
         <EndGameConfirmModal
           awayScore={adjustedAwayScore}
@@ -534,17 +582,6 @@ export function ScoreGamePage({ gameConfig, initialState, onEndGame, onGameConfi
           onExit={confirmEndGame}
           onExtend={extendGame}
           onPlayAgain={confirmEndGame}
-        />
-      )}
-      {isBattingOrderOpen && (
-        <BattingOrderModal
-          onClose={() => setIsBattingOrderOpen(false)}
-          teamOneName={gameConfig.teamOneName}
-          teamOnePlayers={teamOnePlayers}
-          teamTwoName={gameConfig.teamTwoName}
-          teamTwoPlayers={teamTwoPlayers}
-          onTeamOnePlayersChange={setTeamOnePlayers}
-          onTeamTwoPlayersChange={setTeamTwoPlayers}
         />
       )}
     </section>
@@ -1145,24 +1182,40 @@ function ScoreSummary({ awayScore, awayTeamName, homeScore, homeTeamName }: Game
 }
 
 type ScoringActionsProps = {
+  disabled?: boolean
   onHit: (baseCount: number) => void
   onOut: () => void
 }
 
 type GameActionPanelProps = ScoringActionsProps & {
-  batterIndex: number
-  lineup: string[]
-  onManageBattingOrder: () => void
-  teamName: string
+  activeTeamKey: TeamKey
+  getBatterIndex: (teamKey: TeamKey) => number
+  getLineup: (teamKey: TeamKey) => string[]
+  getTeamTracksBatting: (teamKey: TeamKey) => boolean
+  inningLabel: string
+  onActivateBattingTracking: (teamKey: TeamKey) => void
+  onManageRoster: () => void
+  teams: Array<{ key: TeamKey; name: string }>
 }
 
-function GameActionPanel({ batterIndex, lineup, onHit, onManageBattingOrder, onOut, teamName }: GameActionPanelProps) {
-  const [isBattingOrderPreviewOpen, setIsBattingOrderPreviewOpen] = useState(false)
-  const battingOrderPreviewRef = useRef<HTMLDivElement>(null)
+function GameActionPanel({
+  activeTeamKey,
+  getBatterIndex,
+  getLineup,
+  getTeamTracksBatting,
+  inningLabel,
+  onActivateBattingTracking,
+  onHit,
+  onManageRoster,
+  onOut,
+  teams,
+}: GameActionPanelProps) {
+  const activeTeam = teams.find((team) => team.key === activeTeamKey) ?? teams[0]
+  const lineup = getLineup(activeTeam.key)
+  const tracksBatting = getTeamTracksBatting(activeTeam.key)
+  const batterIndex = getBatterIndex(activeTeam.key)
   const activeLineupIndex = batterIndex % Math.max(lineup.length, 1)
-  const currentBatter = lineup[activeLineupIndex] || `${teamName} Batter`
-  const fullLineup = lineup.length ? lineup : [currentBatter]
-  const nextBatter = lineup.length > 1 ? lineup[(activeLineupIndex + 1) % lineup.length] : 'Lineup wraps here'
+  const currentBatter = lineup[activeLineupIndex] || `${activeTeam.name} Batter`
   const upcomingLineup = lineup.length
     ? [...lineup.slice(activeLineupIndex + 1), ...lineup.slice(0, activeLineupIndex)].map((player, visibleIndex) => ({
         originalIndex: (activeLineupIndex + 1 + visibleIndex) % lineup.length,
@@ -1170,85 +1223,73 @@ function GameActionPanel({ batterIndex, lineup, onHit, onManageBattingOrder, onO
       }))
     : []
 
-  useEffect(() => {
-    if (!isBattingOrderPreviewOpen) {
-      return
-    }
-
-    function closeOnOutsideClick(event: PointerEvent) {
-      if (battingOrderPreviewRef.current?.contains(event.target as Node)) {
-        return
-      }
-
-      setIsBattingOrderPreviewOpen(false)
-    }
-
-    document.addEventListener('pointerdown', closeOnOutsideClick)
-    return () => document.removeEventListener('pointerdown', closeOnOutsideClick)
-  }, [isBattingOrderPreviewOpen])
-
   return (
     <section className="game-action-panel" aria-label="Batting controls and lineup">
-      <section className="live-lineup-card" aria-label={`${teamName} batting order`}>
-        <div className="live-lineup-heading">
-          <div>
-            <span>Up Next</span>
-            <strong>{teamName}</strong>
-          </div>
-          <button type="button" aria-label="Manage batting order" onClick={onManageBattingOrder}>
-            <svg viewBox="0 0 20 20" aria-hidden="true">
-              <path d="M4 6h8.25M15.25 6H16" />
-              <path d="M4 10h1.25M8.75 10H16" />
-              <path d="M4 14h6.25M13.75 14H16" />
-              <circle cx="13.75" cy="6" r="1.5" />
-              <circle cx="7.25" cy="10" r="1.5" />
-              <circle cx="12.25" cy="14" r="1.5" />
-            </svg>
-          </button>
-        </div>
-        <div className="live-lineup-list">
-          {upcomingLineup.map(({ originalIndex, player }) => (
-            <div className="live-lineup-row" key={`${player}-${originalIndex}`}>
-              <span>{originalIndex + 1}</span>
-              <strong>{player}</strong>
-            </div>
-          ))}
-        </div>
-      </section>
-      <section className="floating-batter-card" aria-label={`${currentBatter} at bat`}>
-        <div className="floating-batter-top">
-          <div>
-            <span>{teamName}</span>
-            <em>Now Batting</em>
-            <strong>{currentBatter}</strong>
-            <small>Up Next: {nextBatter}</small>
-          </div>
-          <div className="floating-batting-order-wrap" ref={battingOrderPreviewRef}>
-            <button className="floating-batting-order-button" type="button" aria-expanded={isBattingOrderPreviewOpen} onClick={() => setIsBattingOrderPreviewOpen((isOpen) => !isOpen)}>
-              <span>Batting Order</span>
-              <svg viewBox="0 0 16 16" aria-hidden="true">
-                <path d="m4 10 4-4 4 4" />
-              </svg>
-            </button>
-            {isBattingOrderPreviewOpen && (
-              <div className="floating-batting-order-popover">
-                {fullLineup.map((player, index) => (
-                  <div className={index === activeLineupIndex ? 'current' : ''} key={`${player}-${index}`}>
-                    <span>{index + 1}</span>
-                    <strong>{player}</strong>
-                  </div>
-                ))}
+      <section className={tracksBatting ? 'floating-batter-card' : 'floating-batter-card tracking-disabled'} aria-label={`${currentBatter} at bat`}>
+        <div className="batter-card-main">
+          <div className="batter-order-panel">
+            <div className="batter-order-heading">
+              <div>
+                <span>{activeTeam.name} Batting</span>
+                <strong>Batting Order</strong>
               </div>
+              <button className="roster-settings-button" type="button" aria-label="Manage rosters" onClick={onManageRoster}>
+                <svg viewBox="0 0 20 20" aria-hidden="true">
+                  <path d="M10 7.25a2.75 2.75 0 1 1 0 5.5 2.75 2.75 0 0 1 0-5.5Z" />
+                  <path d="M16.25 10a6.5 6.5 0 0 0-.08-1.02l1.37-1.05-1.5-2.6-1.6.64a6.36 6.36 0 0 0-1.78-1.03L12.42 3h-3l-.24 1.94c-.64.24-1.24.59-1.77 1.03l-1.61-.64-1.5 2.6 1.37 1.05a6.72 6.72 0 0 0 0 2.04L4.3 12.07l1.5 2.6 1.61-.64c.53.44 1.13.79 1.77 1.03l.24 1.94h3l.24-1.94c.65-.24 1.25-.59 1.78-1.03l1.6.64 1.5-2.6-1.37-1.05c.05-.33.08-.67.08-1.02Z" />
+                </svg>
+              </button>
+            </div>
+            <div className="batter-order-list">
+              {tracksBatting && upcomingLineup.map(({ originalIndex, player }, visibleIndex) => (
+                <div className={visibleIndex === 0 ? 'up-next' : ''} key={`${player}-${originalIndex}`}>
+                  <span>{visibleIndex === 0 ? 'Next' : originalIndex + 1}</span>
+                  <strong>{player}</strong>
+                </div>
+              ))}
+              {tracksBatting && upcomingLineup.length === 0 && (
+                <div className="empty-order-row">
+                  <span>Next</span>
+                  <strong>Add players in settings</strong>
+                </div>
+              )}
+              {!tracksBatting && (
+                <div className="empty-order-row">
+                  <span>Off</span>
+                  <strong>Turn on tracking in settings</strong>
+                </div>
+              )}
+            </div>
+          </div>
+          <div className="batter-current-panel">
+            {tracksBatting && (
+              <div className="batter-player-card current">
+                <div>
+                  <span>Now Batting</span>
+                  <strong>{currentBatter}</strong>
+                </div>
+                <BatterActionControls onHit={onHit} onOut={onOut} />
+              </div>
+            )}
+            {!tracksBatting && (
+              <div className="batting-unavailable">
+                <strong>Tracking off</strong>
+                <small>Activate to manage this lineup.</small>
+              </div>
+            )}
+            {!tracksBatting && (
+              <button className="activate-batting-button" type="button" onClick={() => onActivateBattingTracking(activeTeam.key)}>
+                Activate
+              </button>
             )}
           </div>
         </div>
-        <BatterActionControls onHit={onHit} onOut={onOut} />
       </section>
     </section>
   )
 }
 
-function BatterActionControls({ onHit, onOut }: ScoringActionsProps) {
+function BatterActionControls({ disabled = false, onHit, onOut }: ScoringActionsProps) {
   const [isHitMenuOpen, setIsHitMenuOpen] = useState(false)
   const hitMenuRef = useRef<HTMLDivElement>(null)
 
@@ -1270,6 +1311,10 @@ function BatterActionControls({ onHit, onOut }: ScoringActionsProps) {
   }, [isHitMenuOpen])
 
   function recordHit(baseCount: number) {
+    if (disabled) {
+      return
+    }
+
     onHit(baseCount)
     setIsHitMenuOpen(false)
   }
@@ -1277,7 +1322,7 @@ function BatterActionControls({ onHit, onOut }: ScoringActionsProps) {
   return (
     <div className="active-batter-actions" aria-label="Score play">
       <div className="hit-menu-wrap" ref={hitMenuRef}>
-        <button className="hit-toggle-button" type="button" aria-expanded={isHitMenuOpen} onClick={() => setIsHitMenuOpen((isOpen) => !isOpen)}>
+        <button className="hit-toggle-button" type="button" aria-expanded={isHitMenuOpen} disabled={disabled} onClick={() => setIsHitMenuOpen((isOpen) => !isOpen)}>
           <span>Hit</span>
           <svg viewBox="0 0 16 16" aria-hidden="true">
             <path d="m4 6 4 4 4-4" />
@@ -1292,9 +1337,161 @@ function BatterActionControls({ onHit, onOut }: ScoringActionsProps) {
           </div>
         )}
       </div>
-      <button type="button" onClick={() => onHit(1)}>Walk</button>
-      <button type="button" onClick={onOut}>Out</button>
+      <button type="button" disabled={disabled} onClick={() => onHit(1)}>Walk</button>
+      <button type="button" disabled={disabled} onClick={onOut}>Out</button>
     </div>
+  )
+}
+
+type RosterSettingsModalProps = {
+  getLineup: (teamKey: TeamKey) => string[]
+  getTeamTracksBatting: (teamKey: TeamKey) => boolean
+  onActivateBattingTracking: (teamKey: TeamKey) => void
+  onClose: () => void
+  onTeamPlayersChange: (teamKey: TeamKey, players: string[]) => void
+  teams: Array<{ key: TeamKey; name: string }>
+}
+
+function RosterSettingsModal({
+  getLineup,
+  getTeamTracksBatting,
+  onActivateBattingTracking,
+  onClose,
+  onTeamPlayersChange,
+  teams,
+}: RosterSettingsModalProps) {
+  return (
+    <div
+      className="modal-backdrop"
+      role="presentation"
+      onPointerDown={(event) => {
+        if (event.target === event.currentTarget) {
+          onClose()
+        }
+      }}
+    >
+      <section className="roster-settings-modal" role="dialog" aria-modal="true" aria-labelledby="roster-settings-title">
+        <div className="roster-settings-header">
+          <div>
+            <span className="modal-eyebrow">Batting</span>
+            <h2 id="roster-settings-title">Roster Settings</h2>
+          </div>
+          <button className="modal-close-button" type="button" aria-label="Close roster settings" onClick={onClose}>
+            <span aria-hidden="true" />
+          </button>
+        </div>
+        <div className="roster-settings-grid">
+          {teams.map((team) => (
+            <RosterTeamEditor
+              key={team.key}
+              onActivate={() => onActivateBattingTracking(team.key)}
+              onPlayersChange={(players) => onTeamPlayersChange(team.key, players)}
+              players={getLineup(team.key)}
+              teamName={team.name}
+              tracksBatting={getTeamTracksBatting(team.key)}
+            />
+          ))}
+        </div>
+      </section>
+    </div>
+  )
+}
+
+type RosterTeamEditorProps = {
+  onActivate: () => void
+  onPlayersChange: (players: string[]) => void
+  players: string[]
+  teamName: string
+  tracksBatting: boolean
+}
+
+function RosterTeamEditor({ onActivate, onPlayersChange, players, teamName, tracksBatting }: RosterTeamEditorProps) {
+  const [draftPlayer, setDraftPlayer] = useState('')
+
+  function addPlayer() {
+    const playerName = draftPlayer.trim()
+    if (!playerName) {
+      return
+    }
+
+    onPlayersChange([...players, playerName])
+    setDraftPlayer('')
+  }
+
+  function movePlayer(index: number, direction: -1 | 1) {
+    const nextIndex = index + direction
+    if (nextIndex < 0 || nextIndex >= players.length) {
+      return
+    }
+
+    const nextPlayers = [...players]
+    const movedPlayer = nextPlayers[index]
+    nextPlayers[index] = nextPlayers[nextIndex]
+    nextPlayers[nextIndex] = movedPlayer
+    onPlayersChange(nextPlayers)
+  }
+
+  return (
+    <section className={tracksBatting ? 'roster-team-editor' : 'roster-team-editor tracking-off'} aria-label={`${teamName} roster`}>
+      <div className="roster-team-heading">
+        <div>
+          <span>{tracksBatting ? 'Tracking On' : 'Tracking Off'}</span>
+          <strong>{teamName}</strong>
+        </div>
+        {!tracksBatting && (
+          <button type="button" onClick={onActivate}>
+            Turn On
+          </button>
+        )}
+      </div>
+      {tracksBatting && (
+        <>
+          <div className="roster-player-list">
+            {players.map((player, index) => (
+              <div className="roster-player-row" key={`${player}-${index}`}>
+                <span>{index + 1}</span>
+                <input
+                  aria-label={`${teamName} batter ${index + 1}`}
+                  maxLength={PLAYER_NAME_MAX_LENGTH}
+                  value={player}
+                  onChange={(event) => onPlayersChange(players.map((currentPlayer, playerIndex) => (playerIndex === index ? event.target.value : currentPlayer)))}
+                />
+                <button type="button" disabled={index === 0} onClick={() => movePlayer(index, -1)}>
+                  Up
+                </button>
+                <button type="button" disabled={index === players.length - 1} onClick={() => movePlayer(index, 1)}>
+                  Down
+                </button>
+                <button type="button" onClick={() => onPlayersChange(players.filter((_, playerIndex) => playerIndex !== index))}>
+                  Remove
+                </button>
+              </div>
+            ))}
+            {players.length === 0 && (
+              <div className="roster-empty-row">
+                Add the first batter below.
+              </div>
+            )}
+          </div>
+          <form
+            className="roster-add-row"
+            onSubmit={(event) => {
+              event.preventDefault()
+              addPlayer()
+            }}
+          >
+            <input
+              maxLength={PLAYER_NAME_MAX_LENGTH}
+              placeholder="Add player"
+              value={draftPlayer}
+              onChange={(event) => setDraftPlayer(event.target.value)}
+            />
+            <button type="submit">Add</button>
+          </form>
+        </>
+      )}
+      {!tracksBatting && <p>Batting order is not active for this team.</p>}
+    </section>
   )
 }
 
@@ -1325,116 +1522,4 @@ function baseKeyToNumber(baseKey: BaseKey) {
 function formatInning(inning: number) {
   const suffix = inning === 1 ? 'st' : inning === 2 ? 'nd' : inning === 3 ? 'rd' : 'th'
   return `${inning}${suffix}`
-}
-
-type BattingOrderModalProps = {
-  onClose: () => void
-  onTeamOnePlayersChange: (players: string[]) => void
-  onTeamTwoPlayersChange: (players: string[]) => void
-  teamOneName: string
-  teamOnePlayers: string[]
-  teamTwoName: string
-  teamTwoPlayers: string[]
-}
-
-function BattingOrderModal({
-  onClose,
-  onTeamOnePlayersChange,
-  onTeamTwoPlayersChange,
-  teamOneName,
-  teamOnePlayers,
-  teamTwoName,
-  teamTwoPlayers,
-}: BattingOrderModalProps) {
-  return (
-    <div className="modal-backdrop" role="presentation">
-      <section className="batting-order-modal" role="dialog" aria-modal="true" aria-labelledby="batting-order-title">
-        <button className="modal-close-button" type="button" aria-label="Close batting order" onClick={onClose}>
-          <span aria-hidden="true" />
-        </button>
-        <span className="modal-eyebrow">Lineups</span>
-        <h2 id="batting-order-title">Batting order</h2>
-        <div className="batting-order-grid">
-          <BattingOrderEditor teamName={teamOneName} players={teamOnePlayers} onPlayersChange={onTeamOnePlayersChange} />
-          <BattingOrderEditor teamName={teamTwoName} players={teamTwoPlayers} onPlayersChange={onTeamTwoPlayersChange} />
-        </div>
-      </section>
-    </div>
-  )
-}
-
-type BattingOrderEditorProps = {
-  onPlayersChange: (players: string[]) => void
-  players: string[]
-  teamName: string
-}
-
-function BattingOrderEditor({ onPlayersChange, players, teamName }: BattingOrderEditorProps) {
-  const [draftPlayer, setDraftPlayer] = useState('')
-
-  function addPlayer() {
-    const playerName = draftPlayer.trim()
-    if (!playerName) {
-      return
-    }
-
-    onPlayersChange([...players, playerName])
-    setDraftPlayer('')
-  }
-
-  function movePlayer(index: number, direction: -1 | 1) {
-    const nextIndex = index + direction
-    if (nextIndex < 0 || nextIndex >= players.length) {
-      return
-    }
-
-    const nextPlayers = [...players]
-    const movedPlayer = nextPlayers[index]
-    nextPlayers[index] = nextPlayers[nextIndex]
-    nextPlayers[nextIndex] = movedPlayer
-    onPlayersChange(nextPlayers)
-  }
-
-  return (
-    <div className="batting-order-editor">
-      <strong>{teamName}</strong>
-      <div className="batting-order-list">
-        {players.map((player, index) => (
-          <div className="batting-order-row" key={index}>
-            <span>{index + 1}</span>
-            <input
-              aria-label={`${teamName} batter ${index + 1}`}
-              maxLength={PLAYER_NAME_MAX_LENGTH}
-              value={player}
-              onChange={(event) => onPlayersChange(players.map((currentPlayer, playerIndex) => (playerIndex === index ? event.target.value : currentPlayer)))}
-            />
-            <button type="button" aria-label="Move batter up" onClick={() => movePlayer(index, -1)}>
-              ↑
-            </button>
-            <button type="button" aria-label="Move batter down" onClick={() => movePlayer(index, 1)}>
-              ↓
-            </button>
-            <button type="button" aria-label={`Remove ${player || `batter ${index + 1}`}`} onClick={() => onPlayersChange(players.filter((_, playerIndex) => playerIndex !== index))}>
-              ×
-            </button>
-          </div>
-        ))}
-        <form
-          className="batting-order-add-row"
-          onSubmit={(event) => {
-            event.preventDefault()
-            addPlayer()
-          }}
-        >
-          <input
-            maxLength={PLAYER_NAME_MAX_LENGTH}
-            placeholder="Add batter"
-            value={draftPlayer}
-            onChange={(event) => setDraftPlayer(event.target.value)}
-          />
-          <button type="submit">Add</button>
-        </form>
-      </div>
-    </div>
-  )
 }

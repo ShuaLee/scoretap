@@ -14,11 +14,11 @@ export function Scoreboard({ activeBattingTeam, homeTeamName, awayTeamName, home
     <header className="score-header">
       <div className="score-teams-row">
         <div className={activeBattingTeam === 'home' ? 'team-score batting' : 'team-score'}>
-          <span>{homeTeamName}</span>
+          <span>{activeBattingTeam === 'home' && <i aria-label="Batting" />} {homeTeamName}</span>
           <strong>{homeScore}</strong>
         </div>
         <div className={activeBattingTeam === 'away' ? 'team-score batting' : 'team-score'}>
-          <span>{awayTeamName}</span>
+          <span>{activeBattingTeam === 'away' && <i aria-label="Batting" />} {awayTeamName}</span>
           <strong>{awayScore}</strong>
         </div>
       </div>
