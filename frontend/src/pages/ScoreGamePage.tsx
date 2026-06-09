@@ -107,10 +107,10 @@ function createEmptyPlayerStatLine(): PlayerStatLine {
 
 function formatHitDepthSummary(line: PlayerStatLine) {
   const depthParts = [
-    line.singles ? `${line.singles} 1B` : '',
-    line.doubles ? `${line.doubles} 2B` : '',
-    line.triples ? `${line.triples} 3B` : '',
-    line.homeRuns ? `${line.homeRuns} HR` : '',
+    line.singles ? '1B' : '',
+    line.doubles ? '2B' : '',
+    line.triples ? '3B' : '',
+    line.homeRuns ? 'HR' : '',
   ].filter(Boolean)
 
   return depthParts.length ? depthParts.join(' / ') : '-'
@@ -593,6 +593,10 @@ export function ScoreGamePage({ gameConfig, initialState, onEndGame, onGameConfi
 
     setBases(preview.bases)
 
+    if (source === 'home') {
+      setPendingScorers((runners) => runners.slice(1))
+    }
+
     if (preview.scoringRunner) {
       const scoringRunner = markRunnerScored(preview.scoringRunner)
       setPendingScorers((runners) => [...runners, scoringRunner])
@@ -611,11 +615,7 @@ export function ScoreGamePage({ gameConfig, initialState, onEndGame, onGameConfi
       return { bases, blocked: false, scoringRunner: null }
     }
 
-    if (source === 'home') {
-      return { bases, blocked: true, scoringRunner: null }
-    }
-
-    const sourceRunner = source === 'atBat' ? currentBatter : bases[source]
+    const sourceRunner = source === 'atBat' ? currentBatter : source === 'home' ? pendingScorers[0] : bases[source]
     if (!sourceRunner) {
       return { bases, blocked: true, scoringRunner: null }
     }
@@ -624,7 +624,7 @@ export function ScoreGamePage({ gameConfig, initialState, onEndGame, onGameConfi
     let scoringRunner: Runner | null = null
 
     if (target === 'home') {
-      if (source === 'atBat') {
+      if (source === 'atBat' || source === 'home') {
         return { bases, blocked: true, scoringRunner: null }
       }
 
@@ -639,9 +639,9 @@ export function ScoreGamePage({ gameConfig, initialState, onEndGame, onGameConfi
       }
     }
 
-    const direction = source === 'atBat' ? 1 : baseKeyToNumber(source) > baseKeyToNumber(target) ? -1 : 1
+    const direction = source === 'atBat' ? 1 : source === 'home' ? -1 : baseKeyToNumber(source) > baseKeyToNumber(target) ? -1 : 1
 
-    if (source !== 'atBat') {
+    if (source !== 'atBat' && source !== 'home') {
       nextBases[source] = null
     }
 
@@ -684,7 +684,6 @@ export function ScoreGamePage({ gameConfig, initialState, onEndGame, onGameConfi
         homeScore={adjustedHomeScore}
         inningLabel={inningLabel}
         outs={outs}
-        onEdit={() => setIsScoreEditorOpen(true)}
       />
       <BaseOccupancy
         bases={bases}
@@ -694,6 +693,8 @@ export function ScoreGamePage({ gameConfig, initialState, onEndGame, onGameConfi
         onDragStart={setDraggedRunnerSource}
         onGetMovePreview={getMovePreview}
         onMoveRunner={moveRunner}
+        onOpenScoreSettings={() => setIsScoreEditorOpen(true)}
+        onManageRoster={() => setIsRosterSettingsOpen(true)}
         onRequestRunnerOut={(_, source) => recordBaseRunnerOut(source)}
         onReturnRunnerToThird={returnPendingScorerToBase}
         pendingScorer={pendingScorers[0] ?? null}
@@ -709,7 +710,6 @@ export function ScoreGamePage({ gameConfig, initialState, onEndGame, onGameConfi
         getTeamTracksBatting={getTeamTracksBatting}
         onActivateBattingTracking={() => activateTeamBattingTracking(battingTeamKey)}
         onHit={recordHit}
-        onManageRoster={() => setIsRosterSettingsOpen(true)}
         onOut={recordOut}
         onWalk={recordWalk}
         teams={[
@@ -733,8 +733,10 @@ export function ScoreGamePage({ gameConfig, initialState, onEndGame, onGameConfi
           scoreModification={scoreModification}
           teamOneName={gameConfig.teamOneName}
           teamOnePlayers={teamOnePlayers}
+          teamOneTracksBatting={gameConfig.teamOneTracksBatting}
           teamTwoName={gameConfig.teamTwoName}
           teamTwoPlayers={teamTwoPlayers}
+          teamTwoTracksBatting={gameConfig.teamTwoTracksBatting}
           trackedBattingTeams={trackedBattingTeams}
           onClose={() => setIsScoreEditorOpen(false)}
           onEndGame={handleEndGame}
@@ -744,6 +746,8 @@ export function ScoreGamePage({ gameConfig, initialState, onEndGame, onGameConfi
           onScheduledInningsChange={(innings) => onGameConfigChange({ ...gameConfig, innings })}
           onScoreAdjustmentsChange={setScoreAdjustments}
           onScoreModificationChange={setScoreModification}
+          onSetBattingTracking={setTeamBattingTracking}
+          onTeamPlayersChange={updateTeamPlayers}
         />
       )}
       {isRosterSettingsOpen && (
@@ -801,6 +805,8 @@ type ScoreEditorModalProps = {
   onScheduledInningsChange: (innings: number) => void
   onScoreAdjustmentsChange: (adjustments: ScoreAdjustments) => void
   onScoreModificationChange: (modification: ScoreModification) => void
+  onSetBattingTracking: (teamKey: TeamKey, shouldTrackBatting: boolean) => void
+  onTeamPlayersChange: (teamKey: TeamKey, players: string[]) => void
   outs: number
   playerStats: PlayerStats
   scheduledInnings: number
@@ -808,8 +814,10 @@ type ScoreEditorModalProps = {
   scoreModification: ScoreModification
   teamOneName: string
   teamOnePlayers: string[]
+  teamOneTracksBatting: boolean
   teamTwoName: string
   teamTwoPlayers: string[]
+  teamTwoTracksBatting: boolean
   trackedBattingTeams: TrackedBattingTeams
 }
 
@@ -829,6 +837,8 @@ function ScoreEditorModal({
   onScheduledInningsChange,
   onScoreAdjustmentsChange,
   onScoreModificationChange,
+  onSetBattingTracking,
+  onTeamPlayersChange,
   outs,
   playerStats,
   scheduledInnings,
@@ -836,11 +846,31 @@ function ScoreEditorModal({
   scoreModification,
   teamOneName,
   teamOnePlayers,
+  teamOneTracksBatting,
   teamTwoName,
   teamTwoPlayers,
+  teamTwoTracksBatting,
   trackedBattingTeams,
 }: ScoreEditorModalProps) {
+  const [activeTab, setActiveTab] = useState<'scorebook' | 'teams'>('scorebook')
   const inningRows = Array.from({ length: Math.max(scheduledInnings, inning) }, (_, index) => index + 1)
+  const teamSettings = [
+    {
+      key: 'teamOne' as const,
+      name: teamOneName,
+      players: teamOnePlayers,
+      tracksBatting: teamOneTracksBatting,
+    },
+    {
+      key: 'teamTwo' as const,
+      name: teamTwoName,
+      players: teamTwoPlayers,
+      tracksBatting: teamTwoTracksBatting,
+    },
+  ]
+  const hasInvalidTrackedLineup = teamSettings.some((team) => (
+    team.tracksBatting && team.players.filter((player) => player.trim()).length < MIN_TRACKED_LINEUP_PLAYERS
+  ))
   const inningAdjustmentTotals = Object.values(scoreAdjustments).reduce(
     (totals, adjustment) => ({
       away: totals.away + adjustment.away,
@@ -862,114 +892,159 @@ function ScoreEditorModal({
     })
   }
 
+  function requestClose() {
+    if (hasInvalidTrackedLineup) {
+      setActiveTab('teams')
+      return
+    }
+
+    onClose()
+  }
+
   return (
-    <div className="modal-backdrop" role="presentation" onClick={onClose}>
+    <div className="modal-backdrop" role="presentation" onClick={requestClose}>
       <section className="score-editor-modal" role="dialog" aria-modal="true" aria-labelledby="score-editor-title" onClick={(event) => event.stopPropagation()}>
         <div className="score-editor-top-actions">
-          <button className="score-editor-game-over-button" type="button" onClick={onEndGame}>
-            Game Over
-          </button>
-          <button className="score-editor-icon-button confirm" type="button" aria-label="Confirm scoreboard changes" onClick={onClose}>
-            <svg viewBox="0 0 16 16" aria-hidden="true">
-              <path d="m4 8.25 2.25 2.25L12 5" />
-            </svg>
-          </button>
-        </div>
-        <span className="modal-eyebrow">Scorebook</span>
-        <h2 id="score-editor-title">Edit scoreboard</h2>
-
-        <div className="score-editor-section">
-          <h3>Game Settings</h3>
-          <div className="score-editor-grid compact">
-            <label>
-              Innings
-              <NumberStepper
-                ariaLabel="Scheduled innings"
-                max={20}
-                min={1}
-                value={scheduledInnings}
-                onChange={onScheduledInningsChange}
-              />
-            </label>
+          <div className="score-editor-tab-nav" aria-label="Settings sections">
+            <button className={activeTab === 'scorebook' ? 'active' : ''} type="button" onClick={() => setActiveTab('scorebook')}>
+              Scorebook and rules
+            </button>
+            <button className={activeTab === 'teams' ? 'active' : ''} type="button" onClick={() => setActiveTab('teams')}>
+              Team settings
+            </button>
+          </div>
+          <div className="score-editor-action-buttons">
+            <button className="score-editor-game-over-button" type="button" onClick={onEndGame}>
+              End Game
+            </button>
+            <button className="score-editor-icon-button confirm" type="button" aria-label="Confirm scoreboard changes" disabled={hasInvalidTrackedLineup} onClick={requestClose}>
+              <svg viewBox="0 0 16 16" aria-hidden="true">
+                <path d="m4 8.25 2.25 2.25L12 5" />
+              </svg>
+            </button>
           </div>
         </div>
+        {hasInvalidTrackedLineup && (
+          <p className="score-editor-tab-notice">
+            Teams tracking at-bats need at least {MIN_TRACKED_LINEUP_PLAYERS} batters. Add batters or switch that team to Runs Only.
+          </p>
+        )}
 
-        <div className="score-editor-section">
-          <h3>Game Position</h3>
-          <div className="score-editor-grid compact">
-            <label>
-              Inning
-              <NumberStepper ariaLabel="Current inning" min={1} value={inning} onChange={onInningChange} />
-            </label>
-            <label>
-              Half
-              <span className="score-editor-select-wrap">
-                <select value={halfInning} onChange={(event) => onHalfInningChange(event.target.value as 'top' | 'bottom')}>
-                  <option value="top">Top</option>
-                  <option value="bottom">Bottom</option>
-                </select>
-              </span>
-            </label>
-            <label>
-              Outs
-              <NumberStepper ariaLabel="Outs" max={2} min={0} value={outs} onChange={onOutsChange} />
-            </label>
-          </div>
-        </div>
-
-        <div className="score-editor-section">
-          <h3>Inning Adjustments</h3>
-          <div className="score-editor-score-summary" aria-label="Current score">
-            <div>
-              <span>{homeTeamName}</span>
-              <strong>{displayedHomeScore}</strong>
+        {activeTab === 'scorebook' && (
+          <>
+            <div className="score-editor-section">
+              <h3>Game Settings</h3>
+              <div className="score-editor-grid compact">
+                <label>
+                  Innings
+                  <NumberStepper
+                    ariaLabel="Scheduled innings"
+                    max={20}
+                    min={1}
+                    value={scheduledInnings}
+                    onChange={onScheduledInningsChange}
+                  />
+                </label>
+              </div>
             </div>
-            <div>
-              <span>{awayTeamName}</span>
-              <strong>{displayedAwayScore}</strong>
+
+            <div className="score-editor-section">
+              <h3>Game Position</h3>
+              <div className="score-editor-grid compact">
+                <label>
+                  Inning
+                  <NumberStepper ariaLabel="Current inning" min={1} value={inning} onChange={onInningChange} />
+                </label>
+                <label>
+                  Half
+                  <span className="score-editor-select-wrap">
+                    <select value={halfInning} onChange={(event) => onHalfInningChange(event.target.value as 'top' | 'bottom')}>
+                      <option value="top">Top</option>
+                      <option value="bottom">Bottom</option>
+                    </select>
+                  </span>
+                </label>
+                <label>
+                  Outs
+                  <NumberStepper ariaLabel="Outs" max={2} min={0} value={outs} onChange={onOutsChange} />
+                </label>
+              </div>
+            </div>
+
+            <div className="score-editor-section">
+              <h3>Inning Adjustments</h3>
+              <div className="score-editor-score-summary" aria-label="Current score">
+                <div>
+                  <span>{homeTeamName}</span>
+                  <strong>{displayedHomeScore}</strong>
+                </div>
+                <div>
+                  <span>{awayTeamName}</span>
+                  <strong>{displayedAwayScore}</strong>
+                </div>
+              </div>
+              <div className="inning-adjustment-tables">
+                <InningAdjustmentTable
+                  extraRuns={scoreModification.home}
+                  inningRows={inningRows}
+                  inningRuns={inningRuns}
+                  onExtraRunsChange={(runs) => onScoreModificationChange({ ...scoreModification, home: runs })}
+                  onUpdateInningAdjustment={updateInningAdjustment}
+                  scoreAdjustments={scoreAdjustments}
+                  team="home"
+                  teamName={homeTeamName}
+                />
+                <InningAdjustmentTable
+                  extraRuns={scoreModification.away}
+                  inningRows={inningRows}
+                  inningRuns={inningRuns}
+                  onExtraRunsChange={(runs) => onScoreModificationChange({ ...scoreModification, away: runs })}
+                  onUpdateInningAdjustment={updateInningAdjustment}
+                  scoreAdjustments={scoreAdjustments}
+                  team="away"
+                  teamName={awayTeamName}
+                />
+              </div>
+            </div>
+
+            <div className="score-editor-section">
+              <h3>Score Breakdown</h3>
+              <div className="score-breakdown-grid">
+                <TeamScoreBreakdown
+                  players={teamOnePlayers}
+                  playerStats={playerStats.teamOne}
+                  shouldShow={trackedBattingTeams.teamOne || Object.keys(playerStats.teamOne ?? {}).length > 0}
+                  teamName={teamOneName}
+                />
+                <TeamScoreBreakdown
+                  players={teamTwoPlayers}
+                  playerStats={playerStats.teamTwo}
+                  shouldShow={trackedBattingTeams.teamTwo || Object.keys(playerStats.teamTwo ?? {}).length > 0}
+                  teamName={teamTwoName}
+                />
+              </div>
+            </div>
+          </>
+        )}
+
+        {activeTab === 'teams' && (
+          <div className="score-editor-section">
+            <h3>Team Settings</h3>
+            <div className="score-editor-roster-grid">
+              {teamSettings.map((team) => (
+                <RosterTeamEditor
+                  key={team.key}
+                  onActivate={() => onSetBattingTracking(team.key, true)}
+                  onDeactivate={() => onSetBattingTracking(team.key, false)}
+                  onPlayersChange={(players) => onTeamPlayersChange(team.key, players)}
+                  players={team.players}
+                  teamName={team.name}
+                  tracksBatting={team.tracksBatting}
+                />
+              ))}
             </div>
           </div>
-          <div className="inning-adjustment-tables">
-            <InningAdjustmentTable
-              extraRuns={scoreModification.home}
-              inningRows={inningRows}
-              inningRuns={inningRuns}
-              onExtraRunsChange={(runs) => onScoreModificationChange({ ...scoreModification, home: runs })}
-              onUpdateInningAdjustment={updateInningAdjustment}
-              scoreAdjustments={scoreAdjustments}
-              team="home"
-              teamName={homeTeamName}
-            />
-            <InningAdjustmentTable
-              extraRuns={scoreModification.away}
-              inningRows={inningRows}
-              inningRuns={inningRuns}
-              onExtraRunsChange={(runs) => onScoreModificationChange({ ...scoreModification, away: runs })}
-              onUpdateInningAdjustment={updateInningAdjustment}
-              scoreAdjustments={scoreAdjustments}
-              team="away"
-              teamName={awayTeamName}
-            />
-          </div>
-        </div>
-
-        <div className="score-editor-section">
-          <h3>Score Breakdown</h3>
-          <div className="score-breakdown-grid">
-            <TeamScoreBreakdown
-              players={teamOnePlayers}
-              playerStats={playerStats.teamOne}
-              shouldShow={trackedBattingTeams.teamOne || Object.keys(playerStats.teamOne ?? {}).length > 0}
-              teamName={teamOneName}
-            />
-            <TeamScoreBreakdown
-              players={teamTwoPlayers}
-              playerStats={playerStats.teamTwo}
-              shouldShow={trackedBattingTeams.teamTwo || Object.keys(playerStats.teamTwo ?? {}).length > 0}
-              teamName={teamTwoName}
-            />
-          </div>
-        </div>
+        )}
       </section>
     </div>
   )
@@ -1002,9 +1077,10 @@ function TeamScoreBreakdown({ players, playerStats, shouldShow, teamName }: Team
         <span>H</span>
         <span>AB</span>
         <span>R</span>
-        <span>Depth</span>
+        <span>Hit</span>
         {playerNames.map((playerName) => {
           const line = playerStats[playerName] ?? createEmptyPlayerStatLine()
+          const hitSummary = formatHitDepthSummary(line)
 
           return (
             <div className="score-breakdown-row" key={playerName}>
@@ -1012,7 +1088,7 @@ function TeamScoreBreakdown({ players, playerStats, shouldShow, teamName }: Team
               <span>{line.hits}</span>
               <span>{line.atBats}</span>
               <span>{line.runs}</span>
-              <em>{formatHitDepthSummary(line)}</em>
+              <em title={hitSummary}>{hitSummary}</em>
             </div>
           )
         })}
@@ -1145,7 +1221,9 @@ type BaseOccupancyProps = {
   onDragEnd: () => void
   onGetMovePreview: (source: RunnerSource, target: RunnerSource) => MovePreview
   onDragStart: (source: RunnerSource) => void
+  onManageRoster: () => void
   onMoveRunner: (source: RunnerSource, target: RunnerSource) => void
+  onOpenScoreSettings: () => void
   onRequestRunnerOut: (runner: Runner, source: BaseKey) => void
   onReturnRunnerToThird: () => void
   onUndo: () => void
@@ -1161,7 +1239,9 @@ function BaseOccupancy({
   onDragEnd,
   onGetMovePreview,
   onDragStart,
+  onManageRoster,
   onMoveRunner,
+  onOpenScoreSettings,
   onRequestRunnerOut,
   onReturnRunnerToThird,
   onUndo,
@@ -1185,12 +1265,28 @@ function BaseOccupancy({
   return (
     <div className="base-area">
       <section className="base-occupancy-card" aria-label="Base runners">
-        <button className="field-undo-button" type="button" aria-label="Undo last scoring action" disabled={!canUndo} onClick={onUndo}>
-          <svg viewBox="0 0 20 20" aria-hidden="true">
-            <path d="M7.25 6.25H4.5v-2.75" />
-            <path d="M4.75 6.25A6.25 6.25 0 1 1 4.4 14" />
-          </svg>
-        </button>
+        <div className="field-control-stack">
+          <div className="field-control-row">
+            <button className="field-undo-button" type="button" aria-label="Undo last scoring action" disabled={!canUndo} onClick={onUndo}>
+              <svg viewBox="0 0 20 20" aria-hidden="true">
+                <path d="M7.25 6.25H4.5v-2.75" />
+                <path d="M4.75 6.25A6.25 6.25 0 1 1 4.4 14" />
+              </svg>
+            </button>
+            <button className="field-settings-button" type="button" aria-label="Open game settings" onClick={onOpenScoreSettings}>
+              <svg viewBox="0 0 20 20" aria-hidden="true">
+                <path d="M8.78 3.34 9.2 2h1.6l.42 1.34c.13.41.5.69.93.76.37.06.72.16 1.06.3.4.16.86.1 1.19-.17l1.06-.88 1.13 1.13-.88 1.06c-.27.33-.33.79-.17 1.19.14.34.24.69.3 1.06.07.43.35.8.76.93L18 9.2v1.6l-1.34.42c-.41.13-.69.5-.76.93-.06.37-.16.72-.3 1.06-.16.4-.1.86.17 1.19l.88 1.06-1.13 1.13-1.06-.88c-.33-.27-.79-.33-1.19-.17-.34.14-.69.24-1.06.3-.43.07-.8.35-.93.76L10.8 18H9.2l-.42-1.34c-.13-.41-.5-.69-.93-.76-.37-.06-.72-.16-1.06-.3-.4-.16-.86-.1-1.19.17l-1.06.88-1.13-1.13.88-1.06c.27-.33.33-.79.17-1.19-.14-.34-.24-.69-.3-1.06-.07-.43-.35-.8-.76-.93L2 10.8V9.2l1.34-.42c.41-.13.69-.5.76-.93.06-.37.16-.72.3-1.06.16-.4.1-.86-.17-1.19l-.88-1.06 1.13-1.13 1.06.88c.33.27.79.33 1.19.17.34-.14.69-.24 1.06-.3.43-.07.8-.35.93-.76Z" />
+                <circle cx="10" cy="10" r="2.65" />
+              </svg>
+            </button>
+          </div>
+          <button className="field-roster-button" type="button" aria-label="Open batting order preferences" onClick={onManageRoster}>
+            <svg viewBox="0 0 20 20" aria-hidden="true">
+              <path d="M5 5.5h10M5 10h10M5 14.5h10" />
+              <path d="M3 5.5h.01M3 10h.01M3 14.5h.01" />
+            </svg>
+          </button>
+        </div>
         <BaseSlot baseKey="third" className="base-slot-3b" dragPreviewTarget={dragPreviewTarget} isPreviewBlocked={Boolean(movePreview?.blocked && dragPreviewTarget === 'third')} label="3B" runner={previewBases.third} draggedRunnerSource={draggedRunnerSource} onDragEnd={handleDragEnd} onDragStart={onDragStart} onMoveRunner={handleMoveRunner} onPreviewTargetChange={setDragPreviewTarget} onRequestRunnerOut={onRequestRunnerOut} />
         <BaseSlot baseKey="second" className="base-slot-2b" dragPreviewTarget={dragPreviewTarget} isPreviewBlocked={Boolean(movePreview?.blocked && dragPreviewTarget === 'second')} label="2B" runner={previewBases.second} draggedRunnerSource={draggedRunnerSource} onDragEnd={handleDragEnd} onDragStart={onDragStart} onMoveRunner={handleMoveRunner} onPreviewTargetChange={setDragPreviewTarget} onRequestRunnerOut={onRequestRunnerOut} />
         <BaseSlot baseKey="first" className="base-slot-1b" dragPreviewTarget={dragPreviewTarget} isPreviewBlocked={Boolean(movePreview?.blocked && dragPreviewTarget === 'first')} label="1B" runner={previewBases.first} draggedRunnerSource={draggedRunnerSource} onDragEnd={handleDragEnd} onDragStart={onDragStart} onMoveRunner={handleMoveRunner} onPreviewTargetChange={setDragPreviewTarget} onRequestRunnerOut={onRequestRunnerOut} />
@@ -1201,6 +1297,8 @@ function BaseOccupancy({
           pendingScorer={pendingScorer}
           pendingScorerCount={pendingScorerCount}
           onConfirmRun={onConfirmRun}
+          onDragEnd={handleDragEnd}
+          onDragStart={onDragStart}
           onMoveRunner={handleMoveRunner}
           onPreviewTargetChange={setDragPreviewTarget}
           onReturnRunnerToBase={onReturnRunnerToThird}
@@ -1242,6 +1340,8 @@ type HomeScoringSlotProps = {
   dragPreviewTarget: RunnerSource | null
   draggedRunnerSource: RunnerSource | null
   isPreviewBlocked: boolean
+  onDragEnd: () => void
+  onDragStart: (source: RunnerSource) => void
   onMoveRunner: (source: RunnerSource, target: RunnerSource) => void
   onPreviewTargetChange: (target: RunnerSource | null) => void
   onConfirmRun: () => void
@@ -1255,6 +1355,8 @@ function HomeScoringSlot({
   draggedRunnerSource,
   isPreviewBlocked,
   onConfirmRun,
+  onDragEnd,
+  onDragStart,
   onMoveRunner,
   onPreviewTargetChange,
   onReturnRunnerToBase,
@@ -1268,6 +1370,22 @@ function HomeScoringSlot({
   ]
     .filter(Boolean)
     .join(' ')
+
+  function handleDragStart(event: DragEvent<HTMLButtonElement>) {
+    const runnerTile = event.currentTarget.closest('.home-score-card')
+    if (runnerTile instanceof HTMLElement) {
+      const tileRect = runnerTile.getBoundingClientRect()
+      const handleRect = event.currentTarget.getBoundingClientRect()
+      const offsetX = handleRect.left - tileRect.left + handleRect.width / 2
+      const offsetY = handleRect.top - tileRect.top + handleRect.height / 2
+
+      event.dataTransfer.setDragImage(runnerTile, offsetX, offsetY)
+    }
+
+    event.dataTransfer.effectAllowed = 'move'
+    event.dataTransfer.setData('text/plain', pendingScorer?.name ?? '')
+    onDragStart('home')
+  }
 
   return (
     <div
@@ -1298,6 +1416,16 @@ function HomeScoringSlot({
       )}
       {pendingScorer && (
         <div className="home-score-card">
+          <button className="runner-drag-handle" type="button" aria-label={`Drag ${pendingScorer.name}`} draggable onDragEnd={onDragEnd} onDragStart={handleDragStart}>
+            <svg viewBox="0 0 16 16" aria-hidden="true">
+              <circle cx="5.5" cy="4" r="1" />
+              <circle cx="10.5" cy="4" r="1" />
+              <circle cx="5.5" cy="8" r="1" />
+              <circle cx="10.5" cy="8" r="1" />
+              <circle cx="5.5" cy="12" r="1" />
+              <circle cx="10.5" cy="12" r="1" />
+            </svg>
+          </button>
           <div className="home-score-card-main">
             <strong>{pendingScorer.name}</strong>
             <em>Scored?</em>
@@ -1480,8 +1608,8 @@ function EndGameConfirmModal({ awayScore, awayTeamName, homeScore, homeTeamName,
   return (
     <div className="modal-backdrop" role="presentation" onClick={onCancel}>
       <section className="game-decision-modal" role="dialog" aria-modal="true" aria-labelledby="end-game-title" onClick={(event) => event.stopPropagation()}>
-        <span className="modal-eyebrow">Game Over</span>
-        <h2 id="end-game-title">Confirm game over?</h2>
+        <span className="modal-eyebrow">End Game</span>
+        <h2 id="end-game-title">Confirm end game?</h2>
         <ScoreSummary awayScore={awayScore} awayTeamName={awayTeamName} homeScore={homeScore} homeTeamName={homeTeamName} />
         <div className="game-decision-actions">
           <button className="secondary" type="button" onClick={onCancel}>
@@ -1555,7 +1683,6 @@ type GameActionPanelProps = {
   getTeamTracksBatting: (teamKey: TeamKey) => boolean
   onActivateBattingTracking: () => void
   onHit: (baseCount: number) => void
-  onManageRoster: () => void
   onOut: () => void
   onWalk: () => void
   teams: Array<{ key: TeamKey; name: string }>
@@ -1569,7 +1696,6 @@ function GameActionPanel({
   getTeamTracksBatting,
   onActivateBattingTracking,
   onHit,
-  onManageRoster,
   onOut,
   onWalk,
   teams,
@@ -1604,13 +1730,6 @@ function GameActionPanel({
                 <span>Batting Order</span>
                 <strong>{activeTeam.name} now batting</strong>
               </div>
-              <button className="roster-settings-button" type="button" aria-label="Manage rosters" onClick={onManageRoster}>
-                <svg viewBox="0 0 20 20" aria-hidden="true">
-                  <path d="M4 6h12M4 14h12" />
-                  <path d="M7.5 3.75v4.5M12.5 11.75v4.5" />
-                  <path d="M6 6a1.5 1.5 0 1 0 3 0 1.5 1.5 0 0 0-3 0ZM11 14a1.5 1.5 0 1 0 3 0 1.5 1.5 0 0 0-3 0Z" />
-                </svg>
-              </button>
             </div>
             <FieldAtBatCard
               canActivateBattingTracking={!tracksBatting}
@@ -1699,7 +1818,7 @@ function BatterActionControls({ disabled = false, onHit, onOut, onWalk }: Scorin
             <button type="button" onClick={() => recordHit(1)}>Single</button>
             <button type="button" onClick={() => recordHit(2)}>Double</button>
             <button type="button" onClick={() => recordHit(3)}>Triple</button>
-            <button type="button" onClick={() => recordHit(4)}>HR</button>
+            <button type="button" onClick={() => recordHit(4)}>Home run</button>
           </div>
         )}
       </div>
