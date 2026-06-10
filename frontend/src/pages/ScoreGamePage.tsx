@@ -566,6 +566,27 @@ export function ScoreGamePage({ gameConfig, initialState, isScoreEditorOpen, onE
     advanceBatter()
   }
 
+  function addRunsOnlyRun() {
+    saveUndoSnapshot()
+    scoreRunner({
+      id: Date.now(),
+      name: battingTeamName,
+      scoredInning: inning,
+      team: battingTeam,
+      teamKey: battingTeamKey,
+    })
+  }
+
+  function addRunsOnlyOut() {
+    saveUndoSnapshot()
+    const nextOuts = outs + 1
+    if (nextOuts >= 3) {
+      switchHalfInning()
+      return
+    }
+    setOuts(nextOuts)
+  }
+
   function getHitDepth(baseCount: number): HitDepth {
     if (baseCount === 1) {
       return 'single'
@@ -709,8 +730,11 @@ export function ScoreGamePage({ gameConfig, initialState, isScoreEditorOpen, onE
         getLineup={getTeamPlayers}
         getTeamTracksBatting={getTeamTracksBatting}
         onActivateBattingTracking={() => activateTeamBattingTracking(battingTeamKey)}
+        onAddRunsOnlyOut={addRunsOnlyOut}
+        onAddRunsOnlyRun={addRunsOnlyRun}
         onHit={recordHit}
         onOut={recordOut}
+        onReorderLineup={updateTeamPlayers}
         onWalk={recordWalk}
         teams={[
           { key: 'teamOne', name: gameConfig.teamOneName },
@@ -853,6 +877,7 @@ function ScoreEditorModal({
   trackedBattingTeams,
 }: ScoreEditorModalProps) {
   const [activeTab, setActiveTab] = useState<'scorebook' | 'teams'>('scorebook')
+  const [hasAttemptedClose, setHasAttemptedClose] = useState(false)
   const [activeAdjustmentTeam, setActiveAdjustmentTeam] = useState<'home' | 'away'>('home')
   const [activeBreakdownTeam, setActiveBreakdownTeam] = useState<'teamOne' | 'teamTwo'>('teamOne')
   const [activeTeamSettingsKey, setActiveTeamSettingsKey] = useState<'teamOne' | 'teamTwo'>('teamOne')
@@ -923,6 +948,7 @@ function ScoreEditorModal({
 
   function requestClose() {
     if (hasInvalidTrackedLineup) {
+      setHasAttemptedClose(true)
       setActiveTab('teams')
       return
     }
@@ -943,14 +969,14 @@ function ScoreEditorModal({
             </button>
           </div>
           <div className="score-editor-action-buttons">
-            <button className="score-editor-icon-button" type="button" aria-label="Close settings" disabled={hasInvalidTrackedLineup} onClick={requestClose}>
+            <button className="score-editor-icon-button" type="button" aria-label="Close settings" onClick={requestClose}>
               <svg viewBox="0 0 16 16" aria-hidden="true">
                 <path d="M4 4l8 8M12 4l-8 8" />
               </svg>
             </button>
           </div>
         </div>
-        {hasInvalidTrackedLineup && (
+        {hasAttemptedClose && hasInvalidTrackedLineup && (
           <p className="score-editor-tab-notice">
             Teams tracking at-bats need at least {MIN_TRACKED_LINEUP_PLAYERS} batters. Add batters or switch that team to Runs Only.
           </p>
@@ -965,29 +991,40 @@ function ScoreEditorModal({
                   <button className="section-edit-button" type="button" onClick={startEditingPosition}>Edit</button>
                 ) : (
                   <div className="section-edit-actions">
-                    <button className="section-cancel-button" type="button" aria-label="Cancel changes" onClick={cancelEditingPosition}>
-                      <svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2 2l8 8M10 2l-8 8" /></svg>
-                    </button>
                     <button className="section-confirm-button" type="button" onClick={confirmPosition}>Confirm</button>
+                    <button className="section-cancel-button" type="button" aria-label="Cancel changes" onClick={cancelEditingPosition}>
+                      <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" /></svg>
+                    </button>
                   </div>
                 )}
               </div>
-              <div className="score-editor-grid narrow">
-                <label>
-                  Total Innings
-                  <NumberStepper ariaLabel="Scheduled innings" disabled={!isEditingPosition} max={20} min={1} value={isEditingPosition ? draftScheduledInnings : scheduledInnings} onChange={setDraftScheduledInnings} />
-                </label>
-                <label>
-                  Inning
-                  <NumberStepper ariaLabel="Current inning" disabled={!isEditingPosition} min={1} value={isEditingPosition ? draftInning : inning} onChange={setDraftInning} />
-                </label>
-                <label>
-                  Half
-                  <div className={isEditingPosition ? 'half-toggle' : 'half-toggle disabled'}>
-                    <button type="button" disabled={!isEditingPosition} className={draftHalfInning === 'top' ? 'active' : ''} onClick={() => setDraftHalfInning('top')}>Top</button>
-                    <button type="button" disabled={!isEditingPosition} className={draftHalfInning === 'bottom' ? 'active' : ''} onClick={() => setDraftHalfInning('bottom')}>Bottom</button>
+              <div className="game-settings-rows">
+                <div className="game-setting-row">
+                  <span className="game-setting-label">Set number of innings:</span>
+                  <div className="game-setting-controls">
+                    {isEditingPosition ? (
+                      <NumberStepper ariaLabel="Scheduled innings" max={20} min={1} value={draftScheduledInnings} onChange={setDraftScheduledInnings} />
+                    ) : (
+                      <span className="game-setting-value">{scheduledInnings}</span>
+                    )}
                   </div>
-                </label>
+                </div>
+                <div className="game-setting-row">
+                  <span className="game-setting-label">Current inning:</span>
+                  <div className="game-setting-controls">
+                    {isEditingPosition ? (
+                      <>
+                        <NumberStepper ariaLabel="Current inning" min={1} value={draftInning} onChange={setDraftInning} />
+                        <div className="half-toggle">
+                          <button type="button" className={draftHalfInning === 'top' ? 'active' : ''} onClick={() => setDraftHalfInning('top')}>Top</button>
+                          <button type="button" className={draftHalfInning === 'bottom' ? 'active' : ''} onClick={() => setDraftHalfInning('bottom')}>Bottom</button>
+                        </div>
+                      </>
+                    ) : (
+                      <span className="game-setting-value">{halfInning === 'top' ? 'Top' : 'Bottom'} of {inning}</span>
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -1042,7 +1079,7 @@ function ScoreEditorModal({
                   }
                   players={teamOnePlayers}
                   playerStats={playerStats.teamOne}
-                  shouldShow={trackedBattingTeams.teamOne || Object.keys(playerStats.teamOne ?? {}).length > 0}
+                  shouldShow={teamOneTracksBatting || Object.values(playerStats.teamOne ?? {}).some((s) => s.atBats > 0)}
                   teamName={teamOneName}
                 />
               )}
@@ -1056,7 +1093,7 @@ function ScoreEditorModal({
                   }
                   players={teamTwoPlayers}
                   playerStats={playerStats.teamTwo}
-                  shouldShow={trackedBattingTeams.teamTwo || Object.keys(playerStats.teamTwo ?? {}).length > 0}
+                  shouldShow={teamTwoTracksBatting || Object.values(playerStats.teamTwo ?? {}).some((s) => s.atBats > 0)}
                   teamName={teamTwoName}
                 />
               )}
@@ -1075,9 +1112,14 @@ function ScoreEditorModal({
             <div className="score-editor-section-heading">
               <h3>Team Settings</h3>
               {isEditingTeamSettings ? (
-                <button className="roster-edit-done-button" type="button" onClick={() => setIsEditingTeamSettings(false)}>Done</button>
+                <div className="section-edit-actions">
+                  <button className="section-confirm-button" type="button" onClick={() => setIsEditingTeamSettings(false)}>Confirm</button>
+                  <button className="section-cancel-button" type="button" aria-label="Close editing" onClick={() => setIsEditingTeamSettings(false)}>
+                    <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" /></svg>
+                  </button>
+                </div>
               ) : (
-                <button className="roster-edit-done-button edit" type="button" onClick={() => setIsEditingTeamSettings(true)}>Edit</button>
+                <button className="section-edit-button" type="button" onClick={() => setIsEditingTeamSettings(true)}>Edit</button>
               )}
             </div>
             {teamSettings.filter((t) => t.key === activeTeamSettingsKey).map((team) => (
@@ -1094,6 +1136,7 @@ function ScoreEditorModal({
                 onDeactivate={() => onSetBattingTracking(team.key, false)}
                 onPlayersChange={(players) => onTeamPlayersChange(team.key, players)}
                 players={team.players}
+                showNotice={false}
                 teamName={team.name}
                 tracksBatting={team.tracksBatting}
               />
@@ -1665,10 +1708,10 @@ function EndGameConfirmModal({ awayScore, awayTeamName, homeScore, homeTeamName,
         <ScoreSummary awayScore={awayScore} awayTeamName={awayTeamName} homeScore={homeScore} homeTeamName={homeTeamName} />
         <div className="game-decision-actions">
           <button className="secondary" type="button" onClick={onCancel}>
-            Keep Playing
+            Continue Game
           </button>
-          <button className="secondary" type="button" onClick={onConfirm}>
-            Exit Game
+          <button className="primary" type="button" onClick={onConfirm}>
+            Confirm End
           </button>
         </div>
       </section>
@@ -1708,11 +1751,11 @@ function FinalScoreModal({ awayScore, awayTeamName, homeScore, homeTeamName, onE
 function ScoreSummary({ awayScore, awayTeamName, homeScore, homeTeamName }: GameDecisionModalProps) {
   return (
     <div className="game-decision-score" aria-label="Score">
-      <div>
+      <div className="team-score">
         <span>{homeTeamName}</span>
         <strong>{homeScore}</strong>
       </div>
-      <div>
+      <div className="team-score">
         <span>{awayTeamName}</span>
         <strong>{awayScore}</strong>
       </div>
@@ -1734,8 +1777,11 @@ type GameActionPanelProps = {
   getLineup: (teamKey: TeamKey) => string[]
   getTeamTracksBatting: (teamKey: TeamKey) => boolean
   onActivateBattingTracking: () => void
+  onAddRunsOnlyOut: () => void
+  onAddRunsOnlyRun: () => void
   onHit: (baseCount: number) => void
   onOut: () => void
+  onReorderLineup: (teamKey: TeamKey, players: string[]) => void
   onWalk: () => void
   teams: Array<{ key: TeamKey; name: string }>
 }
@@ -1746,12 +1792,19 @@ function GameActionPanel({
   getBatterIndex,
   getLineup,
   getTeamTracksBatting,
-  onActivateBattingTracking,
+  onActivateBattingTracking: _onActivateBattingTracking,
+  onAddRunsOnlyOut,
+  onAddRunsOnlyRun,
   onHit,
   onOut,
+  onReorderLineup,
   onWalk,
   teams,
 }: GameActionPanelProps) {
+  const [isEditingOrder, setIsEditingOrder] = useState(false)
+  const [dragSourceIndex, setDragSourceIndex] = useState<number | null>(null)
+  const [dragTargetIndex, setDragTargetIndex] = useState<number | null>(null)
+
   const activeTeam = teams.find((team) => team.key === activeTeamKey) ?? teams[0]
   const lineup = getLineup(activeTeam.key)
   const tracksBatting = getTeamTracksBatting(activeTeam.key)
@@ -1765,63 +1818,159 @@ function GameActionPanel({
       .filter((entry): entry is [BaseKey, Runner] => Boolean(entry[1]))
       .map(([baseKey, runner]) => [runner.name, formatBaseLabel(baseKey)]),
   )
-  const upcomingLineup = lineup.length
-    ? [...lineup.slice(activeLineupIndex + 1), ...lineup.slice(0, activeLineupIndex)].map((player, visibleIndex) => ({
-        originalIndex: (activeLineupIndex + 1 + visibleIndex) % lineup.length,
-        player,
-      }))
-    : []
+
+  const namedPlayers = lineup.filter((p) => p.trim())
+
+  // Rotate so current batter is always first in the viewing list
+  const currentBatterNamedIndex = namedPlayers.indexOf(currentBatter)
+  const rotatedLineup = canRecordAtBats && currentBatterNamedIndex >= 0
+    ? [...namedPlayers.slice(currentBatterNamedIndex), ...namedPlayers.slice(0, currentBatterNamedIndex)]
+    : namedPlayers
+
+  function getDragLineup() {
+    if (dragSourceIndex === null || dragTargetIndex === null || dragSourceIndex === dragTargetIndex) {
+      return namedPlayers
+    }
+    const arr = [...namedPlayers]
+    const [item] = arr.splice(dragSourceIndex, 1)
+    arr.splice(dragTargetIndex, 0, item)
+    return arr
+  }
+
+  function commitReorder(targetIndex: number) {
+    if (dragSourceIndex === null) return
+    const arr = [...namedPlayers]
+    const [item] = arr.splice(dragSourceIndex, 1)
+    arr.splice(targetIndex, 0, item)
+    const empties = Array(lineup.length - arr.length).fill('')
+    onReorderLineup(activeTeam.key, [...arr, ...empties])
+    setDragSourceIndex(null)
+    setDragTargetIndex(null)
+  }
+
+  if (!tracksBatting) {
+    return (
+      <section className="game-action-panel" aria-label="Scoring controls">
+        <div className="runs-only-actions-row">
+          <button className="runs-only-action-button" type="button" onClick={onAddRunsOnlyRun}>
+            Add a run
+          </button>
+          <button className="runs-only-action-button" type="button" onClick={onAddRunsOnlyOut}>
+            Add an out
+          </button>
+        </div>
+      </section>
+    )
+  }
+
+  // Edit mode shows original order for intuitive reordering; view mode shows rotated
+  const displayLineup = isEditingOrder ? getDragLineup() : rotatedLineup
 
   return (
     <section className="game-action-panel" aria-label="Batting controls and lineup">
-      <section className={tracksBatting ? 'floating-batter-card' : 'floating-batter-card tracking-disabled'} aria-label={`${currentBatter} at bat`}>
-        <div className="batter-card-main">
-          <div className="batter-order-panel">
-            <div className="batter-order-heading">
-              <div>
-                <span>Batting Order</span>
-                <strong>{activeTeam.name} now batting</strong>
-              </div>
+      <div className="batting-panels-row">
+        <div className="batting-panel-tile">
+          <div className="batting-panel-header">
+            <div className="batting-panel-header-text">
+              <span>Batting Order</span>
+              <strong>{activeTeam.name}</strong>
             </div>
-            <FieldAtBatCard
-              canActivateBattingTracking={!tracksBatting}
-              currentBatterName={currentBatter}
-              isBattingTracked={canRecordAtBats}
-              onActivateBattingTracking={onActivateBattingTracking}
-              onHit={onHit}
-              onOut={onOut}
-              onWalk={onWalk}
-            />
-            <div className="batter-order-list">
-              {canRecordAtBats && upcomingLineup.map(({ originalIndex, player }, visibleIndex) => (
-                <div className={visibleIndex === 0 ? 'up-next' : ''} key={`${player}-${originalIndex}`}>
-                  <span>{visibleIndex === 0 ? 'Next' : originalIndex + 1}</span>
+            {canRecordAtBats && (
+              <button
+                aria-label={isEditingOrder ? 'Done editing order' : 'Edit batting order'}
+                className={isEditingOrder ? 'batting-order-edit-button active' : 'batting-order-edit-button'}
+                type="button"
+                onClick={() => setIsEditingOrder((v) => !v)}
+              >
+                {isEditingOrder ? (
+                  <svg viewBox="0 0 16 16" aria-hidden="true">
+                    <path d="m4 8.25 2.25 2.25L12 5" />
+                  </svg>
+                ) : (
+                  <svg viewBox="0 0 16 16" aria-hidden="true">
+                    <path d="M2 5h12M2 8h12M2 11h12" />
+                  </svg>
+                )}
+              </button>
+            )}
+          </div>
+          <div
+            className="batter-order-scroll"
+            onDragLeave={(e) => {
+              if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+                setDragTargetIndex(null)
+              }
+            }}
+          >
+            {canRecordAtBats && displayLineup.map((player, index) => {
+              const orderPosition = isEditingOrder ? index + 1 : namedPlayers.indexOf(player) + 1
+              return (
+                <div
+                  className={[
+                    !isEditingOrder && index === 0 ? 'now-batting' : '',
+                    isEditingOrder && dragSourceIndex === index ? 'dragging' : '',
+                    isEditingOrder && dragTargetIndex === index && dragSourceIndex !== index ? 'drag-over' : '',
+                  ].filter(Boolean).join(' ')}
+                  draggable={isEditingOrder}
+                  key={`${player}-${index}`}
+                  onDragEnd={() => { setDragSourceIndex(null); setDragTargetIndex(null) }}
+                  onDragOver={(e) => { e.preventDefault(); if (isEditingOrder) setDragTargetIndex(index) }}
+                  onDragStart={() => setDragSourceIndex(index)}
+                  onDrop={() => commitReorder(index)}
+                >
+                  {isEditingOrder ? (
+                    <span className="batting-order-drag-handle" aria-hidden="true">
+                      <svg viewBox="0 0 16 16">
+                        <circle cx="5" cy="4" r="1.4" />
+                        <circle cx="11" cy="4" r="1.4" />
+                        <circle cx="5" cy="8" r="1.4" />
+                        <circle cx="11" cy="8" r="1.4" />
+                        <circle cx="5" cy="12" r="1.4" />
+                        <circle cx="11" cy="12" r="1.4" />
+                      </svg>
+                    </span>
+                  ) : (
+                    <span>{orderPosition}</span>
+                  )}
                   <strong>{player}</strong>
-                  {baseByPlayerName.has(player) && <em>{baseByPlayerName.get(player)}</em>}
+                  {!isEditingOrder && baseByPlayerName.has(player) && <em>{baseByPlayerName.get(player)}</em>}
                 </div>
-              ))}
-              {tracksBatting && !hasMinimumTrackedLineup && (
-                <div className="empty-order-row">
-                  <span>4+</span>
-                  <strong>Add at least {MIN_TRACKED_LINEUP_PLAYERS} batters in settings</strong>
-                </div>
-              )}
-              {canRecordAtBats && upcomingLineup.length === 0 && (
-                <div className="empty-order-row">
-                  <span>Next</span>
-                  <strong>Add players in settings</strong>
-                </div>
-              )}
-              {!tracksBatting && (
-                <div className="empty-order-row">
-                  <span>Off</span>
-                  <strong>Turn on tracking in settings</strong>
-                </div>
-              )}
-            </div>
+              )
+            })}
+            {!hasMinimumTrackedLineup && (
+              <div className="empty-order-row">
+                <span>4+</span>
+                <strong>Add at least {MIN_TRACKED_LINEUP_PLAYERS} batters in settings</strong>
+              </div>
+            )}
           </div>
         </div>
-      </section>
+
+        <div className="batting-panel-tile now-batting-tile">
+          <div className="batting-panel-header">
+            <div className="batting-panel-header-text">
+              <span>Now Batting</span>
+              <strong>{canRecordAtBats ? currentBatter : 'Need 4 batters'}</strong>
+            </div>
+          </div>
+          <div className="batting-actions-grid">
+            <button type="button" disabled={!canRecordAtBats} onClick={() => onHit(1)}>
+              <i>1B</i>Single
+            </button>
+            <button type="button" disabled={!canRecordAtBats} onClick={() => onHit(2)}>
+              <i>2B</i>Double
+            </button>
+            <button type="button" disabled={!canRecordAtBats} onClick={() => onHit(3)}>
+              <i>3B</i>Triple
+            </button>
+            <button type="button" disabled={!canRecordAtBats} onClick={() => onHit(4)}>
+              <i>HR</i>Home Run
+            </button>
+            <button className="walk-action" type="button" disabled={!canRecordAtBats} onClick={onWalk}>Walk</button>
+            <button className="out-action" type="button" disabled={!canRecordAtBats} onClick={onOut}>Out</button>
+          </div>
+        </div>
+      </div>
     </section>
   )
 }
@@ -1967,11 +2116,12 @@ type RosterTeamEditorProps = {
   onDeactivate: () => void
   onPlayersChange: (players: string[]) => void
   players: string[]
+  showNotice?: boolean
   teamName: string
   tracksBatting: boolean
 }
 
-function RosterTeamEditor({ header, isEditing = true, onActivate, onDeactivate, onPlayersChange, players, teamName, tracksBatting }: RosterTeamEditorProps) {
+function RosterTeamEditor({ header, isEditing = true, onActivate, onDeactivate, onPlayersChange, players, showNotice = true, teamName, tracksBatting }: RosterTeamEditorProps) {
   const [draftPlayer, setDraftPlayer] = useState('')
   const [draggedPlayerIndex, setDraggedPlayerIndex] = useState<number | null>(null)
   const [dropTargetIndex, setDropTargetIndex] = useState<number | null>(null)
@@ -2068,7 +2218,7 @@ function RosterTeamEditor({ header, isEditing = true, onActivate, onDeactivate, 
           </>
         ) : (
           <div className="roster-tracking-row">
-            <span className="roster-tracking-label">Tracking</span>
+            <span className="roster-tracking-label">Tracking:</span>
             <div className="scoring-type-wrap" ref={scoringDropdownRef}>
               <button className="scoring-type-button" type="button" disabled={isLocked} onClick={() => setIsScoringDropdownOpen((o) => !o)}>
                 {tracksBatting ? 'At-Bats & Runs' : 'Runs Only'}
@@ -2093,7 +2243,7 @@ function RosterTeamEditor({ header, isEditing = true, onActivate, onDeactivate, 
       {tracksBatting && (
         <>
           <div className="roster-player-list">
-            {needsMorePlayers && (
+            {showNotice && needsMorePlayers && (
               <div className="roster-lineup-notice">
                 Add at least {MIN_TRACKED_LINEUP_PLAYERS} batters to record at-bats for this team.
               </div>
@@ -2106,6 +2256,7 @@ function RosterTeamEditor({ header, isEditing = true, onActivate, onDeactivate, 
               if (isLocked) {
                 return (
                   <div className="roster-player-row locked" key={index}>
+                    <span className="drag-handle" aria-hidden="true" />
                     <span>{index + 1}</span>
                     <span className="roster-player-name-text">{player || '—'}</span>
                   </div>
