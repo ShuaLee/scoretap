@@ -1825,8 +1825,7 @@ body {
 }
 
 .field-undo-button,
-.field-settings-button,
-.field-roster-button {
+.field-settings-button {
   display: grid;
   place-items: center;
   width: 36px;
@@ -1841,8 +1840,7 @@ body {
 }
 
 .field-undo-button:hover,
-.field-settings-button:hover,
-.field-roster-button:hover {
+.field-settings-button:hover {
   border-color: rgba(220, 160, 68, 0.55);
   background: #ffffff;
   color: var(--color-gold);
@@ -1858,8 +1856,7 @@ body {
 }
 
 .field-undo-button svg,
-.field-settings-button svg,
-.field-roster-button svg {
+.field-settings-button svg {
   width: 18px;
   height: 18px;
   fill: none;
@@ -2845,15 +2842,8 @@ body {
   font-weight: 650;
 }
 
-/* Two side-by-side batting panel tiles */
-.batting-panels-row {
-  display: grid;
-  grid-template-columns: 1fr 1.35fr;
-  gap: 10px;
-  align-items: stretch;
-}
-
-.batting-panel-tile {
+/* Combined batting tile */
+.combined-batting-tile {
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -2861,6 +2851,21 @@ body {
   border-radius: 16px;
   background: #ffffff;
   box-shadow: 0 18px 44px rgba(0, 16, 32, 0.08);
+}
+
+.combined-batting-body {
+  display: grid;
+  grid-template-columns: 50% 50%;
+  min-height: 0;
+}
+
+.combined-batting-body .batter-order-scroll {
+  border-right: 1px solid rgba(18, 56, 44, 0.07);
+  max-height: 220px;
+}
+
+.combined-batting-body .batting-actions-grid {
+  align-self: stretch;
 }
 
 .batting-panel-header {
@@ -2974,17 +2979,6 @@ body {
   cursor: grabbing;
 }
 
-.batter-order-scroll > div.dragging {
-  opacity: 0.25;
-  transform: scale(0.97);
-}
-
-.batter-order-scroll > div.drag-over {
-  border-top: 2px solid var(--color-primary);
-  border-radius: 0 0 10px 10px;
-  margin-top: -1px;
-}
-
 .batter-order-scroll > div.now-batting {
   border-color: rgba(220, 160, 68, 0.5);
   background: rgba(220, 160, 68, 0.14);
@@ -3005,18 +2999,6 @@ body {
 .batter-order-scroll > div.now-batting span {
   background: rgba(220, 160, 68, 0.28);
   color: var(--color-primary);
-}
-
-.batting-order-drag-handle {
-  display: grid;
-  place-items: center;
-  color: var(--color-muted);
-}
-
-.batting-order-drag-handle svg {
-  width: 14px;
-  height: 14px;
-  fill: currentColor;
 }
 
 .batter-order-scroll strong {
@@ -3042,10 +3024,11 @@ body {
   font-weight: 500;
 }
 
-/* Batting action buttons grid */
+/* Batting action buttons grid — right column of combined tile */
 .batting-actions-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
+  grid-template-rows: repeat(3, 1fr);
   gap: 6px;
   padding: 8px;
 }
@@ -5063,11 +5046,7 @@ body {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
-  .batting-panels-row {
-    grid-template-columns: 1fr;
-  }
-
-  .batter-order-scroll {
-    max-height: 130px;
+  .combined-batting-body .batter-order-scroll {
+    max-height: 180px;
   }
 }

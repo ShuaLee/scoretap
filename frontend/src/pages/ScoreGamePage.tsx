@@ -715,7 +715,6 @@ export function ScoreGamePage({ gameConfig, initialState, isScoreEditorOpen, onE
         onDragStart={setDraggedRunnerSource}
         onGetMovePreview={getMovePreview}
         onMoveRunner={moveRunner}
-        onManageRoster={() => setIsRosterSettingsOpen(true)}
         onRequestRunnerOut={(_, source) => recordBaseRunnerOut(source)}
         onReturnRunnerToThird={returnPendingScorerToBase}
         pendingScorer={pendingScorers[0] ?? null}
@@ -733,6 +732,7 @@ export function ScoreGamePage({ gameConfig, initialState, isScoreEditorOpen, onE
         onAddRunsOnlyOut={addRunsOnlyOut}
         onAddRunsOnlyRun={addRunsOnlyRun}
         onHit={recordHit}
+        onOpenRosterSettings={() => setIsRosterSettingsOpen(true)}
         onOut={recordOut}
         onReorderLineup={updateTeamPlayers}
         onWalk={recordWalk}
@@ -1324,7 +1324,6 @@ type BaseOccupancyProps = {
   onDragEnd: () => void
   onGetMovePreview: (source: RunnerSource, target: RunnerSource) => MovePreview
   onDragStart: (source: RunnerSource) => void
-  onManageRoster: () => void
   onMoveRunner: (source: RunnerSource, target: RunnerSource) => void
   onRequestRunnerOut: (runner: Runner, source: BaseKey) => void
   onReturnRunnerToThird: () => void
@@ -1341,7 +1340,6 @@ function BaseOccupancy({
   onDragEnd,
   onGetMovePreview,
   onDragStart,
-  onManageRoster,
   onMoveRunner,
   onRequestRunnerOut,
   onReturnRunnerToThird,
@@ -1375,12 +1373,6 @@ function BaseOccupancy({
               </svg>
             </button>
           </div>
-          <button className="field-roster-button" type="button" aria-label="Open batting order preferences" onClick={onManageRoster}>
-            <svg viewBox="0 0 20 20" aria-hidden="true">
-              <path d="M5 5.5h10M5 10h10M5 14.5h10" />
-              <path d="M3 5.5h.01M3 10h.01M3 14.5h.01" />
-            </svg>
-          </button>
         </div>
         <BaseSlot baseKey="third" className="base-slot-3b" dragPreviewTarget={dragPreviewTarget} isPreviewBlocked={Boolean(movePreview?.blocked && dragPreviewTarget === 'third')} label="3B" runner={previewBases.third} draggedRunnerSource={draggedRunnerSource} onDragEnd={handleDragEnd} onDragStart={onDragStart} onMoveRunner={handleMoveRunner} onPreviewTargetChange={setDragPreviewTarget} onRequestRunnerOut={onRequestRunnerOut} />
         <BaseSlot baseKey="second" className="base-slot-2b" dragPreviewTarget={dragPreviewTarget} isPreviewBlocked={Boolean(movePreview?.blocked && dragPreviewTarget === 'second')} label="2B" runner={previewBases.second} draggedRunnerSource={draggedRunnerSource} onDragEnd={handleDragEnd} onDragStart={onDragStart} onMoveRunner={handleMoveRunner} onPreviewTargetChange={setDragPreviewTarget} onRequestRunnerOut={onRequestRunnerOut} />
@@ -1780,6 +1772,7 @@ type GameActionPanelProps = {
   onAddRunsOnlyOut: () => void
   onAddRunsOnlyRun: () => void
   onHit: (baseCount: number) => void
+  onOpenRosterSettings: () => void
   onOut: () => void
   onReorderLineup: (teamKey: TeamKey, players: string[]) => void
   onWalk: () => void
@@ -1796,15 +1789,12 @@ function GameActionPanel({
   onAddRunsOnlyOut,
   onAddRunsOnlyRun,
   onHit,
+  onOpenRosterSettings,
   onOut,
-  onReorderLineup,
+  onReorderLineup: _onReorderLineup,
   onWalk,
   teams,
 }: GameActionPanelProps) {
-  const [isEditingOrder, setIsEditingOrder] = useState(false)
-  const [dragSourceIndex, setDragSourceIndex] = useState<number | null>(null)
-  const [dragTargetIndex, setDragTargetIndex] = useState<number | null>(null)
-
   const activeTeam = teams.find((team) => team.key === activeTeamKey) ?? teams[0]
   const lineup = getLineup(activeTeam.key)
   const tracksBatting = getTeamTracksBatting(activeTeam.key)
@@ -1821,32 +1811,10 @@ function GameActionPanel({
 
   const namedPlayers = lineup.filter((p) => p.trim())
 
-  // Rotate so current batter is always first in the viewing list
   const currentBatterNamedIndex = namedPlayers.indexOf(currentBatter)
   const rotatedLineup = canRecordAtBats && currentBatterNamedIndex >= 0
     ? [...namedPlayers.slice(currentBatterNamedIndex), ...namedPlayers.slice(0, currentBatterNamedIndex)]
     : namedPlayers
-
-  function getDragLineup() {
-    if (dragSourceIndex === null || dragTargetIndex === null || dragSourceIndex === dragTargetIndex) {
-      return namedPlayers
-    }
-    const arr = [...namedPlayers]
-    const [item] = arr.splice(dragSourceIndex, 1)
-    arr.splice(dragTargetIndex, 0, item)
-    return arr
-  }
-
-  function commitReorder(targetIndex: number) {
-    if (dragSourceIndex === null) return
-    const arr = [...namedPlayers]
-    const [item] = arr.splice(dragSourceIndex, 1)
-    arr.splice(targetIndex, 0, item)
-    const empties = Array(lineup.length - arr.length).fill('')
-    onReorderLineup(activeTeam.key, [...arr, ...empties])
-    setDragSourceIndex(null)
-    setDragTargetIndex(null)
-  }
 
   if (!tracksBatting) {
     return (
@@ -1863,77 +1831,40 @@ function GameActionPanel({
     )
   }
 
-  // Edit mode shows original order for intuitive reordering; view mode shows rotated
-  const displayLineup = isEditingOrder ? getDragLineup() : rotatedLineup
-
   return (
     <section className="game-action-panel" aria-label="Batting controls and lineup">
-      <div className="batting-panels-row">
-        <div className="batting-panel-tile">
-          <div className="batting-panel-header">
-            <div className="batting-panel-header-text">
-              <span>Batting Order</span>
-              <strong>{activeTeam.name}</strong>
-            </div>
-            {canRecordAtBats && (
-              <button
-                aria-label={isEditingOrder ? 'Done editing order' : 'Edit batting order'}
-                className={isEditingOrder ? 'batting-order-edit-button active' : 'batting-order-edit-button'}
-                type="button"
-                onClick={() => setIsEditingOrder((v) => !v)}
-              >
-                {isEditingOrder ? (
-                  <svg viewBox="0 0 16 16" aria-hidden="true">
-                    <path d="m4 8.25 2.25 2.25L12 5" />
-                  </svg>
-                ) : (
-                  <svg viewBox="0 0 16 16" aria-hidden="true">
-                    <path d="M2 5h12M2 8h12M2 11h12" />
-                  </svg>
-                )}
-              </button>
-            )}
+      <div className="combined-batting-tile">
+        <div className="batting-panel-header">
+          <div className="batting-panel-header-text">
+            <span>Batting Order</span>
+            <strong>{activeTeam.name}</strong>
           </div>
-          <div
-            className="batter-order-scroll"
-            onDragLeave={(e) => {
-              if (!e.currentTarget.contains(e.relatedTarget as Node)) {
-                setDragTargetIndex(null)
-              }
-            }}
-          >
-            {canRecordAtBats && displayLineup.map((player, index) => {
-              const orderPosition = isEditingOrder ? index + 1 : namedPlayers.indexOf(player) + 1
+          {canRecordAtBats && (
+            <button
+              aria-label="Edit batting order"
+              className="batting-order-edit-button"
+              type="button"
+              onClick={onOpenRosterSettings}
+            >
+              <svg viewBox="0 0 16 16" aria-hidden="true">
+                <path d="M2 5h12M2 8h12M2 11h12" />
+              </svg>
+            </button>
+          )}
+        </div>
+
+        <div className="combined-batting-body">
+          <div className="batter-order-scroll">
+            {canRecordAtBats && rotatedLineup.map((player, index) => {
+              const orderPosition = namedPlayers.indexOf(player) + 1
               return (
                 <div
-                  className={[
-                    !isEditingOrder && index === 0 ? 'now-batting' : '',
-                    isEditingOrder && dragSourceIndex === index ? 'dragging' : '',
-                    isEditingOrder && dragTargetIndex === index && dragSourceIndex !== index ? 'drag-over' : '',
-                  ].filter(Boolean).join(' ')}
-                  draggable={isEditingOrder}
+                  className={index === 0 ? 'now-batting' : ''}
                   key={`${player}-${index}`}
-                  onDragEnd={() => { setDragSourceIndex(null); setDragTargetIndex(null) }}
-                  onDragOver={(e) => { e.preventDefault(); if (isEditingOrder) setDragTargetIndex(index) }}
-                  onDragStart={() => setDragSourceIndex(index)}
-                  onDrop={() => commitReorder(index)}
                 >
-                  {isEditingOrder ? (
-                    <span className="batting-order-drag-handle" aria-hidden="true">
-                      <svg viewBox="0 0 16 16">
-                        <circle cx="5" cy="4" r="1.4" />
-                        <circle cx="11" cy="4" r="1.4" />
-                        <circle cx="5" cy="8" r="1.4" />
-                        <circle cx="11" cy="8" r="1.4" />
-                        <circle cx="5" cy="12" r="1.4" />
-                        <circle cx="11" cy="12" r="1.4" />
-                      </svg>
-                    </span>
-                  ) : (
-                    <span>{orderPosition}</span>
-                  )}
+                  <span>{orderPosition}</span>
                   <strong>{player}</strong>
-                  {!isEditingOrder && baseByPlayerName.has(player) && <em>{baseByPlayerName.get(player)}</em>}
+                  {baseByPlayerName.has(player) && <em>{baseByPlayerName.get(player)}</em>}
                 </div>
               )
             })}
@@ -1944,15 +1875,7 @@ function GameActionPanel({
               </div>
             )}
           </div>
-        </div>
 
-        <div className="batting-panel-tile now-batting-tile">
-          <div className="batting-panel-header">
-            <div className="batting-panel-header-text">
-              <span>Now Batting</span>
-              <strong>{canRecordAtBats ? currentBatter : 'Need 4 batters'}</strong>
-            </div>
-          </div>
           <div className="batting-actions-grid">
             <button type="button" disabled={!canRecordAtBats} onClick={() => onHit(1)}>
               <i>1B</i>Single
