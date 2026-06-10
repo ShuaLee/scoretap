@@ -28,6 +28,7 @@ export default function App() {
   const [storedGame, setStoredGame] = useState<StoredGame | null>(() => readStoredGame())
   const [page, setPage] = useState<Page>(() => (storedGame ? 'score-game' : 'home'))
   const [isWaitlistOpen, setIsWaitlistOpen] = useState(false)
+  const [isScoreEditorOpen, setIsScoreEditorOpen] = useState(false)
   const [gameConfig, setGameConfig] = useState<GameConfig>(() => storedGame?.gameConfig ?? defaultGameConfig)
 
   function beginGame(config: GameConfig) {
@@ -88,6 +89,7 @@ export default function App() {
         hasActiveGame={Boolean(storedGame)}
         onHome={() => setPage('home')}
         onJoinWaitlist={() => setIsWaitlistOpen(true)}
+        onOpenSettings={page === 'score-game' ? () => setIsScoreEditorOpen(true) : undefined}
         onStartGame={startOrContinueGame}
         variant={page === 'home' ? 'home' : 'setup'}
       />
@@ -98,9 +100,11 @@ export default function App() {
           <ScoreGamePage
             gameConfig={gameConfig}
             initialState={storedGame?.gameConfig === gameConfig ? storedGame.gameState : undefined}
+            isScoreEditorOpen={isScoreEditorOpen}
             onEndGame={endActiveGame}
             onGameConfigChange={updateActiveGameConfig}
             onGameStateChange={persistGameState}
+            onScoreEditorOpenChange={setIsScoreEditorOpen}
           />
         )}
       </MainArea>

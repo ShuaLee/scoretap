@@ -140,9 +140,8 @@ body {
   border-radius: 999px;
   font: inherit;
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 600;
   padding: 8px 18px;
-  text-transform: uppercase;
   cursor: pointer;
 }
 
@@ -154,6 +153,35 @@ body {
 .nav-waitlist-button {
   background: transparent;
   color: var(--color-gold);
+}
+
+.nav-settings-button {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid #8c9aaa;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--color-muted);
+  padding: 0;
+  cursor: pointer;
+}
+
+.nav-settings-button:hover {
+  border-color: #6a7a8a;
+  background: #f0f2f4;
+  color: var(--color-text);
+}
+
+.nav-settings-button svg {
+  width: 17px;
+  height: 17px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.5;
 }
 
 .nav-waitlist-button:hover {
@@ -1688,7 +1716,47 @@ body {
 
 .score-teams-row {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+}
+
+.score-inning-outs {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 10px 18px;
+  border-left: 1px solid var(--color-border);
+  border-right: 1px solid var(--color-border);
+}
+
+.score-inning-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+  white-space: nowrap;
+}
+
+.score-outs-dots {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.out-dot {
+  display: block;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  border: 1.5px solid var(--color-muted);
+  background: transparent;
+  transition: background 0.15s;
+}
+
+.out-dot.filled {
+  background: var(--color-muted);
 }
 
 .team-score {
@@ -1714,51 +1782,7 @@ body {
   box-shadow: inset 0 -3px 0 var(--color-gold);
 }
 
-.score-status-row {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  justify-content: center;
-  min-height: 34px;
-  border-top: 1px solid var(--color-border);
-  color: var(--color-muted);
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
 
-.scoreboard-edit-button {
-  position: absolute;
-  right: 8px;
-  display: grid;
-  place-items: center;
-  width: 28px;
-  height: 28px;
-  border: 0;
-  border-radius: 999px;
-  background: transparent;
-  color: #64748b;
-  padding: 0;
-  cursor: pointer;
-}
-
-.scoreboard-edit-button:hover,
-.scoreboard-edit-button:active {
-  background: rgba(var(--color-primary-rgb), 0.1);
-  color: var(--color-primary);
-}
-
-.scoreboard-edit-button svg {
-  width: 17px;
-  height: 17px;
-  fill: none;
-  stroke: currentColor;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-width: 1.7;
-}
 
 .base-area {
   display: grid;
@@ -2938,6 +2962,42 @@ body {
   background: #f8fafc;
 }
 
+.roster-team-toggle {
+  padding: 12px 12px 0;
+}
+
+.roster-tracking-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.roster-tracking-label {
+  color: var(--color-text);
+  font-size: 13px;
+}
+
+.roster-edit-done-button {
+  flex-shrink: 0;
+  min-height: 28px;
+  border: 1px solid #8c9aaa;
+  border-radius: 999px;
+  background: transparent;
+  color: #4a4540;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 0 12px;
+  cursor: pointer;
+}
+
+.roster-edit-done-button:not(.edit) {
+  background: var(--color-gold);
+  border-color: var(--color-gold);
+  color: #ffffff;
+}
+
 .roster-team-heading {
   display: flex;
   align-items: center;
@@ -2971,21 +3031,95 @@ body {
   white-space: nowrap;
 }
 
-.roster-team-heading button {
-  min-height: 34px;
-  border: 1px solid rgba(var(--color-primary-rgb), 0.3);
-  border-radius: 9px;
-  background: #ffffff;
-  color: var(--color-primary);
-  font: inherit;
-  font-size: 11px;
-  font-weight: 800;
-  text-transform: uppercase;
-  cursor: pointer;
+.scoring-type-wrap {
+  position: relative;
+  flex-shrink: 0;
 }
 
-.roster-team-heading button:hover {
-  background: rgba(var(--color-primary-rgb), 0.1);
+.scoring-type-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: #ffffff;
+  color: var(--color-muted);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 0 10px 0 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.scoring-type-button:hover {
+  border-color: #b0bac4;
+  color: var(--color-text);
+}
+
+.scoring-type-button svg {
+  width: 8px;
+  height: 5px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+  flex-shrink: 0;
+}
+
+.scoring-type-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 10;
+  min-width: 148px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: #ffffff;
+  box-shadow: 0 8px 24px rgba(0, 16, 32, 0.12);
+  overflow: hidden;
+}
+
+.scoring-type-dropdown button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 10px 12px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.scoring-type-dropdown button:hover {
+  background: #f4f6f8;
+}
+
+.scoring-type-dropdown button.active {
+  color: var(--color-dark-green);
+  font-weight: 600;
+}
+
+.scoring-type-dropdown button + button {
+  border-top: 1px solid var(--color-border);
+}
+
+.scoring-type-dropdown button svg {
+  width: 12px;
+  height: 12px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
+  flex-shrink: 0;
 }
 
 .roster-player-list {
@@ -2993,6 +3127,21 @@ body {
   max-height: min(340px, 46vh);
   overflow-x: hidden;
   overflow-y: auto;
+}
+
+.roster-player-row.locked {
+  grid-template-columns: 30px minmax(0, 1fr);
+  cursor: default;
+}
+
+.roster-player-name-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-text);
+  font-size: 14px;
+  padding: 0 4px;
 }
 
 .roster-player-row {
@@ -3082,7 +3231,7 @@ body {
   box-sizing: border-box;
   gap: 6px;
   border-top: 1px solid rgba(18, 56, 44, 0.09);
-  background: #f8fafc;
+  background: #eaecef;
   padding: 10px 8px;
 }
 
@@ -3184,35 +3333,34 @@ body {
   display: grid;
   place-items: center;
   min-height: 34px;
-  border: 1px solid var(--color-border);
+  border: 1px solid #8c9aaa;
   border-radius: 999px;
   background: #ffffff;
   color: var(--color-muted);
   font: inherit;
-  font-size: 11px;
-  font-weight: 800;
-  text-transform: uppercase;
+  font-size: 13px;
+  font-weight: 500;
   cursor: pointer;
 }
 
 .score-editor-game-over-button {
+  display: inline-flex;
+  align-items: center;
   min-height: 34px;
-  border: 1px solid var(--color-border);
+  border: 1px solid #8c9aaa;
   border-radius: 999px;
-  background: #ffffff;
-  color: var(--color-muted);
+  background: transparent;
+  color: #4a4540;
   font: inherit;
-  font-size: 11px;
-  font-weight: 800;
-  padding: 0 12px;
-  text-transform: uppercase;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 0 14px;
   cursor: pointer;
 }
 
 .score-editor-game-over-button:hover {
-  border-color: var(--color-gold);
-  background: rgba(var(--color-primary-rgb), 0.1);
-  color: var(--color-primary);
+  border-color: rgba(220, 160, 68, 0.5);
+  background: rgba(var(--color-primary-rgb), 0.08);
 }
 
 .score-editor-icon-button {
@@ -3242,7 +3390,7 @@ body {
 }
 
 .score-editor-icon-button.confirm:hover {
-  background: var(--color-primary-hover);
+  background: var(--color-primary);
   color: #ffffff;
 }
 
@@ -3261,9 +3409,8 @@ body {
   min-width: 0;
   margin: 0;
   border: 0;
-  border-radius: 12px;
-  background: #f8fafc;
-  padding: 4px;
+  background: transparent;
+  padding: 0;
 }
 
 .score-editor-tab-nav button {
@@ -3282,7 +3429,7 @@ body {
 }
 
 .score-editor-tab-nav button.active {
-  background: #ffffff;
+  background: transparent;
   color: var(--color-dark-green);
 }
 
@@ -3407,11 +3554,121 @@ body {
   margin-top: 18px;
 }
 
+.score-editor-section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
 .score-editor-section h3 {
   margin: 0;
   color: var(--color-navy);
   font-size: 16px;
   font-weight: 650;
+}
+
+.section-edit-button,
+.section-confirm-button {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  border-radius: 999px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 0 12px;
+  cursor: pointer;
+}
+
+.section-edit-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.section-edit-button {
+  border: 1px solid #8c9aaa;
+  background: transparent;
+  color: var(--color-muted);
+}
+
+.section-edit-button:hover {
+  border-color: #6a7a8a;
+  color: var(--color-text);
+}
+
+.section-cancel-button {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid #8c9aaa;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--color-muted);
+  padding: 0;
+  cursor: pointer;
+}
+
+.section-cancel-button:hover {
+  border-color: #6a7a8a;
+  color: var(--color-text);
+}
+
+.section-cancel-button svg {
+  width: 10px;
+  height: 10px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-width: 2;
+}
+
+.section-confirm-button {
+  border: 1px solid var(--color-gold);
+  background: var(--color-gold);
+  color: #ffffff;
+}
+
+.section-confirm-button:hover {
+  background: var(--color-gold);
+}
+
+.score-editor-end-game-section {
+  margin-top: 24px;
+  padding-top: 18px;
+  border-top: 1px solid var(--color-border);
+}
+
+.score-editor-end-game-button {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  border: 1px solid #8c9aaa;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--color-muted);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 0 18px;
+  cursor: pointer;
+}
+
+.score-editor-end-game-button:hover {
+  border-color: #c0392b;
+  color: #c0392b;
+}
+
+.number-stepper.disabled {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.half-toggle.disabled {
+  opacity: 0.5;
+  pointer-events: none;
 }
 
 .score-editor-section p {
@@ -3429,6 +3686,12 @@ body {
 
 .score-editor-grid.compact {
   grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.score-editor-grid.narrow {
+  grid-template-columns: repeat(3, auto);
+  justify-content: start;
+  gap: 10px;
 }
 
 .score-editor-roster-grid {
@@ -3461,29 +3724,51 @@ body {
   outline: none;
 }
 
-.score-editor-select-wrap {
-  position: relative;
+.half-toggle {
   display: grid;
-  min-width: 0;
-}
-
-.score-editor-select-wrap select {
-  appearance: none;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   min-height: 40px;
+  border: 1px solid var(--color-border);
   border-radius: 9px;
-  background:
-    linear-gradient(45deg, transparent 50%, currentColor 50%) calc(100% - 16px) 17px / 5px 5px no-repeat,
-    linear-gradient(135deg, currentColor 50%, transparent 50%) calc(100% - 11px) 17px / 5px 5px no-repeat,
-    #ffffff;
-  color: var(--color-text);
-  font-size: 13px;
-  font-weight: 750;
-  padding: 0 30px 0 12px;
+  overflow: hidden;
 }
 
-.score-editor-select-wrap:focus-within select {
-  border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px rgba(var(--color-primary-rgb), 0.14);
+.half-toggle button {
+  border: 0;
+  background: transparent;
+  color: var(--color-muted);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+
+.half-toggle button + button {
+  box-shadow: inset 1px 0 0 var(--color-border);
+}
+
+.half-toggle button.active {
+  background: var(--color-gold);
+  color: #ffffff;
+}
+
+.half-toggle button:not(.active):hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.team-toggle {
+  min-height: 30px;
+  width: 50%;
+  min-width: 120px;
+  margin: 0 auto;
+}
+
+.team-toggle button {
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .number-stepper {
@@ -3588,10 +3873,116 @@ body {
   line-height: 1;
 }
 
-.inning-adjustment-tables {
+.game-log {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
+  gap: 1px;
+  background: var(--color-border);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.game-log-inning {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  background: #ffffff;
+  padding: 10px 12px;
+}
+
+.game-log-inning-num {
+  flex-shrink: 0;
+  padding-top: 9px;
+  min-width: 44px;
+  color: var(--color-muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.game-log-team-rows {
+  display: grid;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+
+.game-log-team-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.game-log-team-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-text);
+  font-size: 13px;
+}
+
+.game-log-team-row .number-stepper {
+  min-height: 32px;
+  width: 96px;
+  grid-template-columns: 26px minmax(22px, 1fr) 26px;
+}
+
+.game-log-team-row .number-stepper button {
+  font-size: 14px;
+}
+
+.game-log-team-row .number-stepper input {
+  font-size: 13px;
+}
+
+.game-log-player-section {
+  display: grid;
+  gap: 5px;
+  background: #f8fafc;
+  padding: 10px 12px;
+}
+
+.game-log-player-section-label {
+  color: var(--color-muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  margin-bottom: 2px;
+}
+
+.game-log-player-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.game-log-player-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-text);
+  font-size: 13px;
+}
+
+.game-log-player-hits {
+  color: var(--color-muted);
+  font-size: 12px;
+}
+
+.game-log-player-runs {
+  flex-shrink: 0;
+  min-width: 24px;
+  color: var(--color-dark-green);
+  font-size: 12px;
+  font-weight: 600;
+  text-align: right;
 }
 
 .inning-adjustment-table {
@@ -3611,13 +4002,7 @@ body {
 .inning-adjustment-team-name {
   grid-column: 1 / -1;
   min-width: 0;
-  overflow: hidden;
-  color: var(--color-navy);
-  font-size: 14px;
-  font-weight: 750;
-  padding: 0 0 4px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  padding-bottom: 4px;
 }
 
 .inning-adjustment-table > span {

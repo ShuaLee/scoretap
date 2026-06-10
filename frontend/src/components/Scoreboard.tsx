@@ -16,14 +16,17 @@ export function Scoreboard({ activeBattingTeam, homeTeamName, awayTeamName, home
           <span>{activeBattingTeam === 'home' && <i aria-label="Batting" />} {homeTeamName}</span>
           <strong>{homeScore}</strong>
         </div>
+        <div className="score-inning-outs">
+          <span className="score-inning-label">{inningLabel}</span>
+          <div className="score-outs-dots" aria-label={`${outs} out${outs !== 1 ? 's' : ''}`}>
+            <span className={outs >= 1 ? 'out-dot filled' : 'out-dot'} />
+            <span className={outs >= 2 ? 'out-dot filled' : 'out-dot'} />
+          </div>
+        </div>
         <div className={activeBattingTeam === 'away' ? 'team-score batting' : 'team-score'}>
           <span>{activeBattingTeam === 'away' && <i aria-label="Batting" />} {awayTeamName}</span>
           <strong>{awayScore}</strong>
         </div>
-      </div>
-      <div className="score-status-row">
-        <span>{inningLabel}</span>
-        <span>{outs === 1 ? '1 Out' : `${outs} Outs`}</span>
       </div>
     </header>
   )

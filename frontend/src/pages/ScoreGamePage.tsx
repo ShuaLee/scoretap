@@ -1,13 +1,15 @@
-import { useEffect, useRef, useState, type DragEvent } from 'react'
+import { useEffect, useRef, useState, type DragEvent, type ReactNode } from 'react'
 import { Scoreboard } from '../components/Scoreboard'
 import { MIN_TRACKED_LINEUP_PLAYERS, PLAYER_NAME_MAX_LENGTH, type GameConfig, type TeamKey } from './GameSetupPage'
 
 type ScoreGamePageProps = {
   gameConfig: GameConfig
   initialState?: PersistedGameState
+  isScoreEditorOpen: boolean
   onEndGame: () => void
   onGameConfigChange: (config: GameConfig) => void
   onGameStateChange: (state: PersistedGameState) => void
+  onScoreEditorOpenChange: (open: boolean) => void
 }
 
 type TeamSide = 'home' | 'away'
@@ -116,11 +118,10 @@ function formatHitDepthSummary(line: PlayerStatLine) {
   return depthParts.length ? depthParts.join(' / ') : '-'
 }
 
-export function ScoreGamePage({ gameConfig, initialState, onEndGame, onGameConfigChange, onGameStateChange }: ScoreGamePageProps) {
+export function ScoreGamePage({ gameConfig, initialState, isScoreEditorOpen, onEndGame, onGameConfigChange, onGameStateChange, onScoreEditorOpenChange }: ScoreGamePageProps) {
   const [isEndGameConfirmOpen, setIsEndGameConfirmOpen] = useState(false)
   const [isFinalScoreOpen, setIsFinalScoreOpen] = useState(false)
   const [isRosterSettingsOpen, setIsRosterSettingsOpen] = useState(false)
-  const [isScoreEditorOpen, setIsScoreEditorOpen] = useState(false)
   const [teamOnePlayers, setTeamOnePlayers] = useState(initialState?.teamOnePlayers ?? gameConfig.teamOnePlayers)
   const [teamTwoPlayers, setTeamTwoPlayers] = useState(initialState?.teamTwoPlayers ?? gameConfig.teamTwoPlayers)
   const [halfInning, setHalfInning] = useState<'top' | 'bottom'>(initialState?.halfInning ?? 'top')
@@ -693,7 +694,6 @@ export function ScoreGamePage({ gameConfig, initialState, onEndGame, onGameConfi
         onDragStart={setDraggedRunnerSource}
         onGetMovePreview={getMovePreview}
         onMoveRunner={moveRunner}
-        onOpenScoreSettings={() => setIsScoreEditorOpen(true)}
         onManageRoster={() => setIsRosterSettingsOpen(true)}
         onRequestRunnerOut={(_, source) => recordBaseRunnerOut(source)}
         onReturnRunnerToThird={returnPendingScorerToBase}
@@ -738,7 +738,7 @@ export function ScoreGamePage({ gameConfig, initialState, onEndGame, onGameConfi
           teamTwoPlayers={teamTwoPlayers}
           teamTwoTracksBatting={gameConfig.teamTwoTracksBatting}
           trackedBattingTeams={trackedBattingTeams}
-          onClose={() => setIsScoreEditorOpen(false)}
+          onClose={() => onScoreEditorOpenChange(false)}
           onEndGame={handleEndGame}
           onHalfInningChange={setHalfInning}
           onInningChange={setInning}
@@ -853,6 +853,35 @@ function ScoreEditorModal({
   trackedBattingTeams,
 }: ScoreEditorModalProps) {
   const [activeTab, setActiveTab] = useState<'scorebook' | 'teams'>('scorebook')
+  const [activeAdjustmentTeam, setActiveAdjustmentTeam] = useState<'home' | 'away'>('home')
+  const [activeBreakdownTeam, setActiveBreakdownTeam] = useState<'teamOne' | 'teamTwo'>('teamOne')
+  const [activeTeamSettingsKey, setActiveTeamSettingsKey] = useState<'teamOne' | 'teamTwo'>('teamOne')
+  const [isEditingTeamSettings, setIsEditingTeamSettings] = useState(false)
+  const [isEditingPosition, setIsEditingPosition] = useState(false)
+  const [draftInning, setDraftInning] = useState(inning)
+  const [draftHalfInning, setDraftHalfInning] = useState<'top' | 'bottom'>(halfInning)
+  const [draftOuts, setDraftOuts] = useState(outs)
+  const [draftScheduledInnings, setDraftScheduledInnings] = useState(scheduledInnings)
+
+  function startEditingPosition() {
+    setDraftInning(inning)
+    setDraftHalfInning(halfInning)
+    setDraftOuts(outs)
+    setDraftScheduledInnings(scheduledInnings)
+    setIsEditingPosition(true)
+  }
+
+  function cancelEditingPosition() {
+    setIsEditingPosition(false)
+  }
+
+  function confirmPosition() {
+    onInningChange(draftInning)
+    onHalfInningChange(draftHalfInning)
+    onOutsChange(draftOuts)
+    onScheduledInningsChange(draftScheduledInnings)
+    setIsEditingPosition(false)
+  }
   const inningRows = Array.from({ length: Math.max(scheduledInnings, inning) }, (_, index) => index + 1)
   const teamSettings = [
     {
@@ -914,12 +943,9 @@ function ScoreEditorModal({
             </button>
           </div>
           <div className="score-editor-action-buttons">
-            <button className="score-editor-game-over-button" type="button" onClick={onEndGame}>
-              End Game
-            </button>
-            <button className="score-editor-icon-button confirm" type="button" aria-label="Confirm scoreboard changes" disabled={hasInvalidTrackedLineup} onClick={requestClose}>
+            <button className="score-editor-icon-button" type="button" aria-label="Close settings" disabled={hasInvalidTrackedLineup} onClick={requestClose}>
               <svg viewBox="0 0 16 16" aria-hidden="true">
-                <path d="m4 8.25 2.25 2.25L12 5" />
+                <path d="M4 4l8 8M12 4l-8 8" />
               </svg>
             </button>
           </div>
@@ -933,59 +959,49 @@ function ScoreEditorModal({
         {activeTab === 'scorebook' && (
           <>
             <div className="score-editor-section">
-              <h3>Game Settings</h3>
-              <div className="score-editor-grid compact">
-                <label>
-                  Innings
-                  <NumberStepper
-                    ariaLabel="Scheduled innings"
-                    max={20}
-                    min={1}
-                    value={scheduledInnings}
-                    onChange={onScheduledInningsChange}
-                  />
-                </label>
+              <div className="score-editor-section-heading">
+                <h3>Game Settings</h3>
+                {!isEditingPosition ? (
+                  <button className="section-edit-button" type="button" onClick={startEditingPosition}>Edit</button>
+                ) : (
+                  <div className="section-edit-actions">
+                    <button className="section-cancel-button" type="button" aria-label="Cancel changes" onClick={cancelEditingPosition}>
+                      <svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2 2l8 8M10 2l-8 8" /></svg>
+                    </button>
+                    <button className="section-confirm-button" type="button" onClick={confirmPosition}>Confirm</button>
+                  </div>
+                )}
               </div>
-            </div>
-
-            <div className="score-editor-section">
-              <h3>Game Position</h3>
-              <div className="score-editor-grid compact">
+              <div className="score-editor-grid narrow">
+                <label>
+                  Total Innings
+                  <NumberStepper ariaLabel="Scheduled innings" disabled={!isEditingPosition} max={20} min={1} value={isEditingPosition ? draftScheduledInnings : scheduledInnings} onChange={setDraftScheduledInnings} />
+                </label>
                 <label>
                   Inning
-                  <NumberStepper ariaLabel="Current inning" min={1} value={inning} onChange={onInningChange} />
+                  <NumberStepper ariaLabel="Current inning" disabled={!isEditingPosition} min={1} value={isEditingPosition ? draftInning : inning} onChange={setDraftInning} />
                 </label>
                 <label>
                   Half
-                  <span className="score-editor-select-wrap">
-                    <select value={halfInning} onChange={(event) => onHalfInningChange(event.target.value as 'top' | 'bottom')}>
-                      <option value="top">Top</option>
-                      <option value="bottom">Bottom</option>
-                    </select>
-                  </span>
-                </label>
-                <label>
-                  Outs
-                  <NumberStepper ariaLabel="Outs" max={2} min={0} value={outs} onChange={onOutsChange} />
+                  <div className={isEditingPosition ? 'half-toggle' : 'half-toggle disabled'}>
+                    <button type="button" disabled={!isEditingPosition} className={draftHalfInning === 'top' ? 'active' : ''} onClick={() => setDraftHalfInning('top')}>Top</button>
+                    <button type="button" disabled={!isEditingPosition} className={draftHalfInning === 'bottom' ? 'active' : ''} onClick={() => setDraftHalfInning('bottom')}>Bottom</button>
+                  </div>
                 </label>
               </div>
             </div>
 
             <div className="score-editor-section">
               <h3>Inning Adjustments</h3>
-              <div className="score-editor-score-summary" aria-label="Current score">
-                <div>
-                  <span>{homeTeamName}</span>
-                  <strong>{displayedHomeScore}</strong>
-                </div>
-                <div>
-                  <span>{awayTeamName}</span>
-                  <strong>{displayedAwayScore}</strong>
-                </div>
-              </div>
-              <div className="inning-adjustment-tables">
+              {activeAdjustmentTeam === 'home' ? (
                 <InningAdjustmentTable
                   extraRuns={scoreModification.home}
+                  header={
+                    <div className="half-toggle team-toggle">
+                      <button type="button" className={activeAdjustmentTeam === 'home' ? 'active' : ''} onClick={() => setActiveAdjustmentTeam('home')}>{homeTeamName}</button>
+                      <button type="button" className={activeAdjustmentTeam === 'away' ? 'active' : ''} onClick={() => setActiveAdjustmentTeam('away')}>{awayTeamName}</button>
+                    </div>
+                  }
                   inningRows={inningRows}
                   inningRuns={inningRuns}
                   onExtraRunsChange={(runs) => onScoreModificationChange({ ...scoreModification, home: runs })}
@@ -994,8 +1010,15 @@ function ScoreEditorModal({
                   team="home"
                   teamName={homeTeamName}
                 />
+              ) : (
                 <InningAdjustmentTable
                   extraRuns={scoreModification.away}
+                  header={
+                    <div className="half-toggle team-toggle">
+                      <button type="button" className={activeAdjustmentTeam === 'home' ? 'active' : ''} onClick={() => setActiveAdjustmentTeam('home')}>{homeTeamName}</button>
+                      <button type="button" className={activeAdjustmentTeam === 'away' ? 'active' : ''} onClick={() => setActiveAdjustmentTeam('away')}>{awayTeamName}</button>
+                    </div>
+                  }
                   inningRows={inningRows}
                   inningRuns={inningRuns}
                   onExtraRunsChange={(runs) => onScoreModificationChange({ ...scoreModification, away: runs })}
@@ -1004,45 +1027,77 @@ function ScoreEditorModal({
                   team="away"
                   teamName={awayTeamName}
                 />
-              </div>
+              )}
             </div>
 
             <div className="score-editor-section">
               <h3>Score Breakdown</h3>
-              <div className="score-breakdown-grid">
+              {activeBreakdownTeam === 'teamOne' && (
                 <TeamScoreBreakdown
+                  header={
+                    <div className="half-toggle team-toggle">
+                      <button type="button" className={activeBreakdownTeam === 'teamOne' ? 'active' : ''} onClick={() => setActiveBreakdownTeam('teamOne')}>{teamOneName}</button>
+                      <button type="button" className={activeBreakdownTeam === 'teamTwo' ? 'active' : ''} onClick={() => setActiveBreakdownTeam('teamTwo')}>{teamTwoName}</button>
+                    </div>
+                  }
                   players={teamOnePlayers}
                   playerStats={playerStats.teamOne}
                   shouldShow={trackedBattingTeams.teamOne || Object.keys(playerStats.teamOne ?? {}).length > 0}
                   teamName={teamOneName}
                 />
+              )}
+              {activeBreakdownTeam === 'teamTwo' && (
                 <TeamScoreBreakdown
+                  header={
+                    <div className="half-toggle team-toggle">
+                      <button type="button" className={activeBreakdownTeam === 'teamOne' ? 'active' : ''} onClick={() => setActiveBreakdownTeam('teamOne')}>{teamOneName}</button>
+                      <button type="button" className={activeBreakdownTeam === 'teamTwo' ? 'active' : ''} onClick={() => setActiveBreakdownTeam('teamTwo')}>{teamTwoName}</button>
+                    </div>
+                  }
                   players={teamTwoPlayers}
                   playerStats={playerStats.teamTwo}
                   shouldShow={trackedBattingTeams.teamTwo || Object.keys(playerStats.teamTwo ?? {}).length > 0}
                   teamName={teamTwoName}
                 />
-              </div>
+              )}
+            </div>
+
+            <div className="score-editor-section score-editor-end-game-section">
+              <button className="score-editor-end-game-button" type="button" onClick={onEndGame}>
+                End Game
+              </button>
             </div>
           </>
         )}
 
         {activeTab === 'teams' && (
           <div className="score-editor-section">
-            <h3>Team Settings</h3>
-            <div className="score-editor-roster-grid">
-              {teamSettings.map((team) => (
-                <RosterTeamEditor
-                  key={team.key}
-                  onActivate={() => onSetBattingTracking(team.key, true)}
-                  onDeactivate={() => onSetBattingTracking(team.key, false)}
-                  onPlayersChange={(players) => onTeamPlayersChange(team.key, players)}
-                  players={team.players}
-                  teamName={team.name}
-                  tracksBatting={team.tracksBatting}
-                />
-              ))}
+            <div className="score-editor-section-heading">
+              <h3>Team Settings</h3>
+              {isEditingTeamSettings ? (
+                <button className="roster-edit-done-button" type="button" onClick={() => setIsEditingTeamSettings(false)}>Done</button>
+              ) : (
+                <button className="roster-edit-done-button edit" type="button" onClick={() => setIsEditingTeamSettings(true)}>Edit</button>
+              )}
             </div>
+            {teamSettings.filter((t) => t.key === activeTeamSettingsKey).map((team) => (
+              <RosterTeamEditor
+                key={team.key}
+                header={
+                  <div className="half-toggle team-toggle">
+                    <button type="button" className={activeTeamSettingsKey === 'teamOne' ? 'active' : ''} onClick={() => setActiveTeamSettingsKey('teamOne')}>{teamOneName}</button>
+                    <button type="button" className={activeTeamSettingsKey === 'teamTwo' ? 'active' : ''} onClick={() => setActiveTeamSettingsKey('teamTwo')}>{teamTwoName}</button>
+                  </div>
+                }
+                isEditing={isEditingTeamSettings}
+                onActivate={() => onSetBattingTracking(team.key, true)}
+                onDeactivate={() => onSetBattingTracking(team.key, false)}
+                onPlayersChange={(players) => onTeamPlayersChange(team.key, players)}
+                players={team.players}
+                teamName={team.name}
+                tracksBatting={team.tracksBatting}
+              />
+            ))}
           </div>
         )}
       </section>
@@ -1051,13 +1106,14 @@ function ScoreEditorModal({
 }
 
 type TeamScoreBreakdownProps = {
+  header: ReactNode
   players: string[]
   playerStats: Record<string, PlayerStatLine>
   shouldShow: boolean
   teamName: string
 }
 
-function TeamScoreBreakdown({ players, playerStats, shouldShow, teamName }: TeamScoreBreakdownProps) {
+function TeamScoreBreakdown({ header, players, playerStats, shouldShow, teamName }: TeamScoreBreakdownProps) {
   if (!shouldShow) {
     return null
   }
@@ -1071,7 +1127,7 @@ function TeamScoreBreakdown({ players, playerStats, shouldShow, teamName }: Team
 
   return (
     <div className="score-breakdown-card">
-      <strong>{teamName}</strong>
+      {header}
       <div className="score-breakdown-table">
         <span>Player</span>
         <span>H</span>
@@ -1102,6 +1158,7 @@ function TeamScoreBreakdown({ players, playerStats, shouldShow, teamName }: Team
 
 type InningAdjustmentTableProps = {
   extraRuns: number
+  header: ReactNode
   inningRows: number[]
   inningRuns: InningRuns
   onExtraRunsChange: (runs: number) => void
@@ -1113,6 +1170,7 @@ type InningAdjustmentTableProps = {
 
 function InningAdjustmentTable({
   extraRuns,
+  header,
   inningRows,
   inningRuns,
   onExtraRunsChange,
@@ -1123,7 +1181,7 @@ function InningAdjustmentTable({
 }: InningAdjustmentTableProps) {
   return (
     <div className="inning-adjustment-table" aria-label={`${teamName} inning adjustments`}>
-      <strong className="inning-adjustment-team-name">{teamName}</strong>
+      <div className="inning-adjustment-team-name">{header}</div>
       <span>Inning</span>
       <span>Scored</span>
       <span>Adjust</span>
@@ -1167,13 +1225,14 @@ function InningAdjustmentTable({
 
 type NumberStepperProps = {
   ariaLabel: string
+  disabled?: boolean
   max?: number
   min?: number
   onChange: (value: number) => void
   value: number
 }
 
-function NumberStepper({ ariaLabel, max, min, onChange, value }: NumberStepperProps) {
+function NumberStepper({ ariaLabel, disabled, max, min, onChange, value }: NumberStepperProps) {
   function clampValue(nextValue: number) {
     if (typeof min === 'number' && nextValue < min) {
       return min
@@ -1195,18 +1254,19 @@ function NumberStepper({ ariaLabel, max, min, onChange, value }: NumberStepperPr
   }
 
   return (
-    <div className="number-stepper">
-      <button type="button" aria-label={`Decrease ${ariaLabel}`} onClick={() => updateValue(value - 1)}>
+    <div className={disabled ? 'number-stepper disabled' : 'number-stepper'}>
+      <button type="button" aria-label={`Decrease ${ariaLabel}`} disabled={disabled} onClick={() => updateValue(value - 1)}>
         -
       </button>
       <input
         aria-label={ariaLabel}
         inputMode="numeric"
+        readOnly={disabled}
         type="text"
         value={value}
         onChange={(event) => updateValue(Number(event.target.value))}
       />
-      <button type="button" aria-label={`Increase ${ariaLabel}`} onClick={() => updateValue(value + 1)}>
+      <button type="button" aria-label={`Increase ${ariaLabel}`} disabled={disabled} onClick={() => updateValue(value + 1)}>
         +
       </button>
     </div>
@@ -1223,7 +1283,6 @@ type BaseOccupancyProps = {
   onDragStart: (source: RunnerSource) => void
   onManageRoster: () => void
   onMoveRunner: (source: RunnerSource, target: RunnerSource) => void
-  onOpenScoreSettings: () => void
   onRequestRunnerOut: (runner: Runner, source: BaseKey) => void
   onReturnRunnerToThird: () => void
   onUndo: () => void
@@ -1241,7 +1300,6 @@ function BaseOccupancy({
   onDragStart,
   onManageRoster,
   onMoveRunner,
-  onOpenScoreSettings,
   onRequestRunnerOut,
   onReturnRunnerToThird,
   onUndo,
@@ -1271,12 +1329,6 @@ function BaseOccupancy({
               <svg viewBox="0 0 20 20" aria-hidden="true">
                 <path d="M7.25 6.25H4.5v-2.75" />
                 <path d="M4.75 6.25A6.25 6.25 0 1 1 4.4 14" />
-              </svg>
-            </button>
-            <button className="field-settings-button" type="button" aria-label="Open game settings" onClick={onOpenScoreSettings}>
-              <svg viewBox="0 0 20 20" aria-hidden="true">
-                <path d="M8.78 3.34 9.2 2h1.6l.42 1.34c.13.41.5.69.93.76.37.06.72.16 1.06.3.4.16.86.1 1.19-.17l1.06-.88 1.13 1.13-.88 1.06c-.27.33-.33.79-.17 1.19.14.34.24.69.3 1.06.07.43.35.8.76.93L18 9.2v1.6l-1.34.42c-.41.13-.69.5-.76.93-.06.37-.16.72-.3 1.06-.16.4-.1.86.17 1.19l.88 1.06-1.13 1.13-1.06-.88c-.33-.27-.79-.33-1.19-.17-.34.14-.69.24-1.06.3-.43.07-.8.35-.93.76L10.8 18H9.2l-.42-1.34c-.13-.41-.5-.69-.93-.76-.37-.06-.72-.16-1.06-.3-.4-.16-.86-.1-1.19.17l-1.06.88-1.13-1.13.88-1.06c.27-.33.33-.79.17-1.19-.14-.34-.24-.69-.3-1.06-.07-.43-.35-.8-.76-.93L2 10.8V9.2l1.34-.42c.41-.13.69-.5.76-.93.06-.37.16-.72.3-1.06.16-.4.1-.86-.17-1.19l-.88-1.06 1.13-1.13 1.06.88c.33.27.79.33 1.19.17.34-.14.69-.24 1.06-.3.43-.07.8-.35.93-.76Z" />
-                <circle cx="10" cy="10" r="2.65" />
               </svg>
             </button>
           </div>
@@ -1909,6 +1961,8 @@ function RosterSettingsModal({
 }
 
 type RosterTeamEditorProps = {
+  header?: ReactNode
+  isEditing?: boolean
   onActivate: () => void
   onDeactivate: () => void
   onPlayersChange: (players: string[]) => void
@@ -1917,10 +1971,24 @@ type RosterTeamEditorProps = {
   tracksBatting: boolean
 }
 
-function RosterTeamEditor({ onActivate, onDeactivate, onPlayersChange, players, teamName, tracksBatting }: RosterTeamEditorProps) {
+function RosterTeamEditor({ header, isEditing = true, onActivate, onDeactivate, onPlayersChange, players, teamName, tracksBatting }: RosterTeamEditorProps) {
   const [draftPlayer, setDraftPlayer] = useState('')
   const [draggedPlayerIndex, setDraggedPlayerIndex] = useState<number | null>(null)
   const [dropTargetIndex, setDropTargetIndex] = useState<number | null>(null)
+  const [isScoringDropdownOpen, setIsScoringDropdownOpen] = useState(false)
+  const scoringDropdownRef = useRef<HTMLDivElement>(null)
+  const isLocked = !!header && !isEditing
+
+  useEffect(() => {
+    if (!isScoringDropdownOpen) return
+    function handleClickOutside(event: MouseEvent) {
+      if (scoringDropdownRef.current && !scoringDropdownRef.current.contains(event.target as Node)) {
+        setIsScoringDropdownOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [isScoringDropdownOpen])
   const namedPlayerCount = players.filter((player) => player.trim()).length
   const needsMorePlayers = tracksBatting && namedPlayerCount < MIN_TRACKED_LINEUP_PLAYERS
   const isPreviewingSwap = draggedPlayerIndex !== null && dropTargetIndex !== null
@@ -1971,20 +2039,55 @@ function RosterTeamEditor({ onActivate, onDeactivate, onPlayersChange, players, 
 
   return (
     <section className={tracksBatting ? 'roster-team-editor' : 'roster-team-editor tracking-off'} aria-label={`${teamName} roster`}>
+      {header && <div className="roster-team-toggle">{header}</div>}
       <div className="roster-team-heading">
-        <div>
-          <span>{tracksBatting ? 'Tracking On' : 'Tracking Off'}</span>
-          <strong>{teamName}</strong>
-        </div>
-        {tracksBatting && (
-          <button type="button" onClick={onDeactivate}>
-            Runs Only
-          </button>
-        )}
-        {!tracksBatting && (
-          <button type="button" onClick={onActivate}>
-            Turn On
-          </button>
+        {!header ? (
+          <>
+            <div>
+              <span>Tracking</span>
+              <strong>{teamName}</strong>
+            </div>
+            <div className="scoring-type-wrap" ref={scoringDropdownRef}>
+              <button className="scoring-type-button" type="button" onClick={() => setIsScoringDropdownOpen((o) => !o)}>
+                {tracksBatting ? 'At-Bats & Runs' : 'Runs Only'}
+                <svg viewBox="0 0 10 6" aria-hidden="true"><path d="M1 1l4 4 4-4" /></svg>
+              </button>
+              {isScoringDropdownOpen && (
+                <div className="scoring-type-dropdown" role="menu">
+                  <button type="button" role="menuitem" className={tracksBatting ? 'active' : ''} onClick={() => { onActivate(); setIsScoringDropdownOpen(false) }}>
+                    Track At-Bats
+                    {tracksBatting && <svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2 6l3 3 5-5" /></svg>}
+                  </button>
+                  <button type="button" role="menuitem" className={!tracksBatting ? 'active' : ''} onClick={() => { onDeactivate(); setIsScoringDropdownOpen(false) }}>
+                    Runs Only
+                    {!tracksBatting && <svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2 6l3 3 5-5" /></svg>}
+                  </button>
+                </div>
+              )}
+            </div>
+          </>
+        ) : (
+          <div className="roster-tracking-row">
+            <span className="roster-tracking-label">Tracking</span>
+            <div className="scoring-type-wrap" ref={scoringDropdownRef}>
+              <button className="scoring-type-button" type="button" disabled={isLocked} onClick={() => setIsScoringDropdownOpen((o) => !o)}>
+                {tracksBatting ? 'At-Bats & Runs' : 'Runs Only'}
+                <svg viewBox="0 0 10 6" aria-hidden="true"><path d="M1 1l4 4 4-4" /></svg>
+              </button>
+              {isScoringDropdownOpen && (
+                <div className="scoring-type-dropdown" role="menu">
+                  <button type="button" role="menuitem" className={tracksBatting ? 'active' : ''} onClick={() => { onActivate(); setIsScoringDropdownOpen(false) }}>
+                    Track At-Bats
+                    {tracksBatting && <svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2 6l3 3 5-5" /></svg>}
+                  </button>
+                  <button type="button" role="menuitem" className={!tracksBatting ? 'active' : ''} onClick={() => { onDeactivate(); setIsScoringDropdownOpen(false) }}>
+                    Runs Only
+                    {!tracksBatting && <svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2 6l3 3 5-5" /></svg>}
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
         )}
       </div>
       {tracksBatting && (
@@ -1999,6 +2102,15 @@ function RosterTeamEditor({ onActivate, onDeactivate, onPlayersChange, players, 
               const isDraggedPosition = draggedPlayerIndex === sourceIndex
               const isDropPosition = dropTargetIndex === index
               const cannotRemovePlayer = tracksBatting && namedPlayerCount <= MIN_TRACKED_LINEUP_PLAYERS && Boolean(player.trim())
+
+              if (isLocked) {
+                return (
+                  <div className="roster-player-row locked" key={index}>
+                    <span>{index + 1}</span>
+                    <span className="roster-player-name-text">{player || '—'}</span>
+                  </div>
+                )
+              }
 
               return (
               <div
@@ -2053,7 +2165,7 @@ function RosterTeamEditor({ onActivate, onDeactivate, onPlayersChange, players, 
               </div>
             )}
           </div>
-          <form
+          {!isLocked && <form
             className="roster-add-row"
             onSubmit={(event) => {
               event.preventDefault()
@@ -2071,7 +2183,7 @@ function RosterTeamEditor({ onActivate, onDeactivate, onPlayersChange, players, 
                 <path d="M8 3.5v9M3.5 8h9" />
               </svg>
             </button>
-          </form>
+          </form>}
         </>
       )}
       {!tracksBatting && <p>Batting order is not active for this team.</p>}
