@@ -1815,6 +1815,15 @@ body {
   color: var(--color-navy);
 }
 
+/* Zones are always visible; they dim until a runner drag can actually drop on them */
+.drag-out-zone.idle,
+.drag-hold-zone.idle {
+  border-color: rgba(18, 56, 44, 0.16);
+  background: rgba(255, 255, 255, 0.6);
+  color: rgba(90, 106, 100, 0.55);
+  box-shadow: none;
+}
+
 /* Temporary holding area in the bottom-right while reorganizing the bases */
 .drag-hold-zone {
   position: absolute;
@@ -1880,6 +1889,51 @@ body {
   white-space: nowrap;
 }
 
+.field-info-modal {
+  width: min(440px, calc(100vw - 32px));
+  max-height: calc(100vh - 64px);
+  overflow-y: auto;
+  border-radius: 16px;
+  background: #ffffff;
+  padding: 20px;
+  box-shadow: 0 24px 60px rgba(0, 16, 32, 0.25);
+}
+
+.field-info-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.field-info-header h2 {
+  margin: 0;
+  color: var(--color-dark-green);
+  font-size: 17px;
+}
+
+.field-info-list {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+}
+
+.field-info-list dt {
+  color: var(--color-primary);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.field-info-list dd {
+  margin: 2px 0 0;
+  color: var(--color-text);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
 .base-occupancy-card {
   position: relative;
   display: grid;
@@ -1912,6 +1966,14 @@ body {
   gap: 6px;
 }
 
+.field-info-button {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 2;
+}
+
+.field-info-button,
 .field-undo-button,
 .field-settings-button {
   display: grid;
@@ -1927,6 +1989,7 @@ body {
   box-shadow: none;
 }
 
+.field-info-button:hover,
 .field-undo-button:hover,
 .field-settings-button:hover {
   border-color: rgba(220, 160, 68, 0.55);
@@ -1943,6 +2006,7 @@ body {
   opacity: 0.72;
 }
 
+.field-info-button svg,
 .field-undo-button svg,
 .field-settings-button svg {
   width: 18px;
@@ -2226,7 +2290,7 @@ body {
 .home-score-card {
   position: relative;
   display: grid;
-  grid-template-columns: 30px minmax(0, 1fr) 58px;
+  grid-template-columns: 30px minmax(0, 1fr) auto;
   align-items: center;
   gap: 6px;
   width: 100%;
@@ -2266,48 +2330,105 @@ body {
   text-transform: uppercase;
 }
 
-.home-score-actions {
-  display: grid;
-  grid-template-columns: repeat(2, 24px);
+.confirm-score-button {
+  display: inline-flex;
+  align-items: center;
   gap: 4px;
-  justify-content: end;
+  min-height: 26px;
+  border: none;
+  border-radius: 999px;
+  background: var(--color-primary);
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 0 9px;
+  cursor: pointer;
 }
 
-.home-score-action {
+.confirm-score-button:hover {
+  background: var(--color-primary-hover);
+}
+
+.confirm-score-button svg {
+  width: 11px;
+  height: 11px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
+}
+
+.home-score-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  justify-self: end;
+}
+
+.deny-score-button {
   display: grid;
   place-items: center;
-  width: 24px;
-  height: 24px;
-  border: 1px solid transparent;
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+  border: 1px solid rgba(18, 56, 44, 0.18);
   border-radius: 999px;
+  background: #ffffff;
+  color: var(--color-muted);
   padding: 0;
   cursor: pointer;
 }
 
-.home-score-action.secondary {
-  background: #ffffff;
-  border-color: rgba(18, 56, 44, 0.14);
-  color: var(--color-muted);
-}
-
-.home-score-action.primary {
-  background: var(--color-primary);
-  color: #ffffff;
-}
-
-.home-score-action:hover {
+.deny-score-button:hover {
   border-color: var(--color-primary);
   color: var(--color-primary);
 }
 
-.home-score-action.primary:hover {
-  background: var(--color-primary-hover);
-  color: #ffffff;
+.deny-score-button svg {
+  width: 11px;
+  height: 11px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
 }
 
-.home-score-action svg {
-  width: 13px;
-  height: 13px;
+.relocate-hint {
+  color: var(--color-dark-green);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.relocate-hint strong {
+  font-weight: 800;
+}
+
+.relocate-back-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 28px;
+  border: 1px solid rgba(18, 56, 44, 0.18);
+  border-radius: 999px;
+  background: #ffffff;
+  color: var(--color-dark-green);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 0 10px;
+  cursor: pointer;
+}
+
+.relocate-back-button:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.relocate-back-button svg {
+  width: 11px;
+  height: 11px;
   fill: none;
   stroke: currentColor;
   stroke-linecap: round;
@@ -3193,8 +3314,35 @@ body {
   transform: translateY(1px);
 }
 
-.batting-actions-grid button.walk-action {
-  color: #4a6c5e;
+.batting-actions-grid button.hit-action {
+  border-color: rgba(var(--color-primary-rgb), 0.5);
+  background: rgba(var(--color-primary-rgb), 0.14);
+}
+
+.batting-actions-grid button.hit-action:hover {
+  border-color: var(--color-gold);
+  background: rgba(var(--color-primary-rgb), 0.22);
+}
+
+.batting-actions-grid button.hit-action:active {
+  background: rgba(var(--color-primary-rgb), 0.3);
+}
+
+.batting-actions-grid button.walk-action,
+.batting-actions-grid button.out-action {
+  border-color: var(--color-gold);
+  background: #ffffff;
+  color: var(--color-gold);
+}
+
+.batting-actions-grid button.walk-action:hover,
+.batting-actions-grid button.out-action:hover {
+  background: rgba(var(--color-primary-rgb), 0.08);
+}
+
+.batting-actions-grid button.walk-action:active,
+.batting-actions-grid button.out-action:active {
+  background: rgba(var(--color-primary-rgb), 0.14);
 }
 
 .batting-actions-grid button:disabled {

@@ -517,6 +517,23 @@ export function ScoreGamePage({ gameConfig, initialState, isScoreEditorOpen, onE
     setOuts(nextOuts)
   }
 
+  function recordPendingScorerOut() {
+    if (pendingScorers.length === 0) {
+      return
+    }
+
+    saveUndoSnapshot()
+    setPendingScorers((runners) => runners.slice(1))
+
+    const nextOuts = outs + 1
+    if (nextOuts >= 3) {
+      switchHalfInning()
+      return
+    }
+
+    setOuts(nextOuts)
+  }
+
   function recordHit(baseCount: number) {
     saveUndoSnapshot()
     recordPlateAppearanceStat(battingTeamKey, currentBatterName, getHitDepth(baseCount))
@@ -655,6 +672,16 @@ export function ScoreGamePage({ gameConfig, initialState, isScoreEditorOpen, onE
     }))
   }
 
+  function holdPendingScorer() {
+    const runner = pendingScorers[0]
+    if (!runner) {
+      return
+    }
+
+    setHeldRunners((runners) => [...runners, runner])
+    setPendingScorers((runners) => runners.slice(1))
+  }
+
   function markRunnerScored(runner: Runner): Runner {
     return {
       ...runner,
@@ -744,7 +771,9 @@ export function ScoreGamePage({ gameConfig, initialState, isScoreEditorOpen, onE
         heldRunner={heldRunners[0] ?? null}
         heldRunnerCount={heldRunners.length}
         onHeldRunnerOut={recordHeldRunnerOut}
+        onHoldPendingScorer={holdPendingScorer}
         onHoldRunner={holdRunner}
+        onPendingScorerOut={recordPendingScorerOut}
         onRequestRunnerOut={(_, source) => recordBaseRunnerOut(source)}
         pendingScorer={pendingScorers[0] ?? null}
         pendingScorerCount={pendingScorers.length}
@@ -967,6 +996,18 @@ function ScoreEditorModal({
   )
   const displayedHomeScore = homeScore + inningAdjustmentTotals.home + scoreModification.home
   const displayedAwayScore = awayScore + inningAdjustmentTotals.away + scoreModification.away
+  const adjustmentTeamToggle = (
+    <div className="half-toggle team-toggle">
+      <button type="button" className={activeAdjustmentTeam === 'home' ? 'active' : ''} onClick={() => setActiveAdjustmentTeam('home')}>{homeTeamName}</button>
+      <button type="button" className={activeAdjustmentTeam === 'away' ? 'active' : ''} onClick={() => setActiveAdjustmentTeam('away')}>{awayTeamName}</button>
+    </div>
+  )
+  const breakdownTeamToggle = (
+    <div className="half-toggle team-toggle">
+      <button type="button" className={activeBreakdownTeam === 'teamOne' ? 'active' : ''} onClick={() => setActiveBreakdownTeam('teamOne')}>{teamOneName}</button>
+      <button type="button" className={activeBreakdownTeam === 'teamTwo' ? 'active' : ''} onClick={() => setActiveBreakdownTeam('teamTwo')}>{teamTwoName}</button>
+    </div>
+  )
 
   function updateInningAdjustment(inningNumber: number, team: 'home' | 'away', value: number) {
     onScoreAdjustmentsChange({
@@ -1066,12 +1107,7 @@ function ScoreEditorModal({
               {activeAdjustmentTeam === 'home' ? (
                 <InningAdjustmentTable
                   extraRuns={scoreModification.home}
-                  header={
-                    <div className="half-toggle team-toggle">
-                      <button type="button" className={activeAdjustmentTeam === 'home' ? 'active' : ''} onClick={() => setActiveAdjustmentTeam('home')}>{homeTeamName}</button>
-                      <button type="button" className={activeAdjustmentTeam === 'away' ? 'active' : ''} onClick={() => setActiveAdjustmentTeam('away')}>{awayTeamName}</button>
-                    </div>
-                  }
+                  header={adjustmentTeamToggle}
                   inningRows={inningRows}
                   inningRuns={inningRuns}
                   onExtraRunsChange={(runs) => onScoreModificationChange({ ...scoreModification, home: runs })}
@@ -1083,12 +1119,7 @@ function ScoreEditorModal({
               ) : (
                 <InningAdjustmentTable
                   extraRuns={scoreModification.away}
-                  header={
-                    <div className="half-toggle team-toggle">
-                      <button type="button" className={activeAdjustmentTeam === 'home' ? 'active' : ''} onClick={() => setActiveAdjustmentTeam('home')}>{homeTeamName}</button>
-                      <button type="button" className={activeAdjustmentTeam === 'away' ? 'active' : ''} onClick={() => setActiveAdjustmentTeam('away')}>{awayTeamName}</button>
-                    </div>
-                  }
+                  header={adjustmentTeamToggle}
                   inningRows={inningRows}
                   inningRuns={inningRuns}
                   onExtraRunsChange={(runs) => onScoreModificationChange({ ...scoreModification, away: runs })}
@@ -1104,12 +1135,7 @@ function ScoreEditorModal({
               <h3>Score Breakdown</h3>
               {activeBreakdownTeam === 'teamOne' && (
                 <TeamScoreBreakdown
-                  header={
-                    <div className="half-toggle team-toggle">
-                      <button type="button" className={activeBreakdownTeam === 'teamOne' ? 'active' : ''} onClick={() => setActiveBreakdownTeam('teamOne')}>{teamOneName}</button>
-                      <button type="button" className={activeBreakdownTeam === 'teamTwo' ? 'active' : ''} onClick={() => setActiveBreakdownTeam('teamTwo')}>{teamTwoName}</button>
-                    </div>
-                  }
+                  header={breakdownTeamToggle}
                   players={teamOnePlayers}
                   playerStats={playerStats.teamOne}
                   shouldShow={teamOneTracksBatting || Object.values(playerStats.teamOne ?? {}).some((s) => s.atBats > 0)}
@@ -1118,12 +1144,7 @@ function ScoreEditorModal({
               )}
               {activeBreakdownTeam === 'teamTwo' && (
                 <TeamScoreBreakdown
-                  header={
-                    <div className="half-toggle team-toggle">
-                      <button type="button" className={activeBreakdownTeam === 'teamOne' ? 'active' : ''} onClick={() => setActiveBreakdownTeam('teamOne')}>{teamOneName}</button>
-                      <button type="button" className={activeBreakdownTeam === 'teamTwo' ? 'active' : ''} onClick={() => setActiveBreakdownTeam('teamTwo')}>{teamTwoName}</button>
-                    </div>
-                  }
+                  header={breakdownTeamToggle}
                   players={teamTwoPlayers}
                   playerStats={playerStats.teamTwo}
                   shouldShow={teamTwoTracksBatting || Object.values(playerStats.teamTwo ?? {}).some((s) => s.atBats > 0)}
@@ -1360,8 +1381,10 @@ type BaseOccupancyProps = {
   onGetMovePreview: (source: RunnerSource, target: RunnerSource) => MovePreview
   onDragStart: (source: RunnerSource) => void
   onHeldRunnerOut: () => void
+  onHoldPendingScorer: () => void
   onHoldRunner: (source: BaseKey) => void
   onMoveRunner: (source: RunnerSource, target: RunnerSource) => void
+  onPendingScorerOut: () => void
   onRequestRunnerOut: (runner: Runner, source: BaseKey) => void
   onUndo: () => void
   pendingScorer: Runner | null
@@ -1379,8 +1402,10 @@ function BaseOccupancy({
   onGetMovePreview,
   onDragStart,
   onHeldRunnerOut,
+  onHoldPendingScorer,
   onHoldRunner,
   onMoveRunner,
+  onPendingScorerOut,
   onRequestRunnerOut,
   onUndo,
   pendingScorer,
@@ -1389,12 +1414,15 @@ function BaseOccupancy({
   const [dragPreviewTarget, setDragPreviewTarget] = useState<RunnerSource | null>(null)
   const [isOutZoneTargeted, setIsOutZoneTargeted] = useState(false)
   const [isHoldZoneTargeted, setIsHoldZoneTargeted] = useState(false)
+  const [isInfoOpen, setIsInfoOpen] = useState(false)
   const movePreview = draggedRunnerSource && dragPreviewTarget ? onGetMovePreview(draggedRunnerSource, dragPreviewTarget) : null
   const previewBases = bases
-  // Only single base runners get the drop-to-out zone; the home plate stack can hold several scorers.
   const draggedBaseKey = draggedRunnerSource === 'first' || draggedRunnerSource === 'second' || draggedRunnerSource === 'third'
     ? draggedRunnerSource
     : null
+  const isDraggingPendingScorer = draggedRunnerSource === 'home'
+  const canDropOut = Boolean(draggedBaseKey) || isDraggingPendingScorer || draggedRunnerSource === 'holding'
+  const canDropOnHold = Boolean(draggedBaseKey) || isDraggingPendingScorer
 
   function handleDragEnd() {
     setDragPreviewTarget(null)
@@ -1427,6 +1455,13 @@ function BaseOccupancy({
   return (
     <div className="base-area">
       <section className="base-occupancy-card" aria-label="Base runners">
+        <button className="field-info-button" type="button" aria-label="How scoring works" onClick={() => setIsInfoOpen(true)}>
+          <svg viewBox="0 0 20 20" aria-hidden="true">
+            <circle cx="10" cy="10" r="7.25" />
+            <path d="M10 9.25v4.25" />
+            <circle cx="10" cy="6.6" r="0.9" fill="currentColor" stroke="none" />
+          </svg>
+        </button>
         <div className="field-control-stack">
           <div className="field-control-row">
             <button className="field-undo-button" type="button" aria-label="Undo last scoring action" disabled={!canUndo} onClick={onUndo}>
@@ -1452,37 +1487,65 @@ function BaseOccupancy({
           onMoveRunner={handleMoveRunner}
           onPreviewTargetChange={setDragPreviewTarget}
         />
-        {(draggedBaseKey || draggedRunnerSource === 'holding') && (
-          <div
-            className={isOutZoneTargeted ? 'drag-out-zone targeted' : 'drag-out-zone'}
-            aria-label="Drop runner here to record an out"
-            onDragEnter={() => setIsOutZoneTargeted(true)}
-            onDragOver={(event) => event.preventDefault()}
-            onDragLeave={() => setIsOutZoneTargeted(false)}
-            onDrop={() => {
-              if (draggedBaseKey) {
-                const runner = bases[draggedBaseKey]
-                if (runner) {
-                  onRequestRunnerOut(runner, draggedBaseKey)
-                }
-              } else {
-                onHeldRunnerOut()
+        <div
+          className={[
+            'drag-out-zone',
+            canDropOut ? '' : 'idle',
+            isOutZoneTargeted && canDropOut ? 'targeted' : '',
+          ].filter(Boolean).join(' ')}
+          aria-label="Drop runner here to record an out"
+          onDragEnter={() => {
+            if (canDropOut) {
+              setIsOutZoneTargeted(true)
+            }
+          }}
+          onDragOver={(event) => {
+            if (canDropOut) {
+              event.preventDefault()
+            }
+          }}
+          onDragLeave={() => setIsOutZoneTargeted(false)}
+          onDrop={() => {
+            if (draggedBaseKey) {
+              const runner = bases[draggedBaseKey]
+              if (runner) {
+                onRequestRunnerOut(runner, draggedBaseKey)
               }
-              handleDragEnd()
-            }}
-          >
-            <span>Out</span>
-          </div>
-        )}
-        {!heldRunner && draggedBaseKey && (
+            } else if (isDraggingPendingScorer) {
+              onPendingScorerOut()
+            } else if (draggedRunnerSource === 'holding') {
+              onHeldRunnerOut()
+            }
+            handleDragEnd()
+          }}
+        >
+          <span>Out</span>
+        </div>
+        {!heldRunner && (
           <div
-            className={isHoldZoneTargeted ? 'drag-hold-zone targeted' : 'drag-hold-zone'}
+            className={[
+              'drag-hold-zone',
+              canDropOnHold ? '' : 'idle',
+              isHoldZoneTargeted && canDropOnHold ? 'targeted' : '',
+            ].filter(Boolean).join(' ')}
             aria-label="Drop runner here to hold while reorganizing bases"
-            onDragEnter={() => setIsHoldZoneTargeted(true)}
-            onDragOver={(event) => event.preventDefault()}
+            onDragEnter={() => {
+              if (canDropOnHold) {
+                setIsHoldZoneTargeted(true)
+              }
+            }}
+            onDragOver={(event) => {
+              if (canDropOnHold) {
+                event.preventDefault()
+              }
+            }}
             onDragLeave={() => setIsHoldZoneTargeted(false)}
             onDrop={() => {
-              onHoldRunner(draggedBaseKey)
+              if (draggedBaseKey) {
+                onHoldRunner(draggedBaseKey)
+              } else if (isDraggingPendingScorer) {
+                onHoldPendingScorer()
+              }
               handleDragEnd()
             }}
           >
@@ -1491,14 +1554,14 @@ function BaseOccupancy({
         )}
         {heldRunner && (
           <div
-            className={isHoldZoneTargeted && draggedBaseKey ? 'drag-hold-zone occupied targeted' : 'drag-hold-zone occupied'}
+            className={isHoldZoneTargeted && canDropOnHold ? 'drag-hold-zone occupied targeted' : 'drag-hold-zone occupied'}
             onDragEnter={() => {
-              if (draggedBaseKey) {
+              if (canDropOnHold) {
                 setIsHoldZoneTargeted(true)
               }
             }}
             onDragOver={(event) => {
-              if (draggedBaseKey) {
+              if (canDropOnHold) {
                 event.preventDefault()
               }
             }}
@@ -1506,6 +1569,8 @@ function BaseOccupancy({
             onDrop={() => {
               if (draggedBaseKey) {
                 onHoldRunner(draggedBaseKey)
+              } else if (isDraggingPendingScorer) {
+                onHoldPendingScorer()
               }
               handleDragEnd()
             }}
@@ -1535,6 +1600,46 @@ function BaseOccupancy({
           </div>
         )}
       </section>
+      {isInfoOpen && (
+        <div className="modal-backdrop" role="presentation" onClick={() => setIsInfoOpen(false)}>
+          <section className="field-info-modal" role="dialog" aria-modal="true" aria-labelledby="field-info-title" onClick={(event) => event.stopPropagation()}>
+            <div className="field-info-header">
+              <h2 id="field-info-title">How scoring works</h2>
+              <button className="score-editor-icon-button" type="button" aria-label="Close info" onClick={() => setIsInfoOpen(false)}>
+                <svg viewBox="0 0 16 16" aria-hidden="true">
+                  <path d="M4 4l8 8M12 4l-8 8" />
+                </svg>
+              </button>
+            </div>
+            <dl className="field-info-list">
+              <div>
+                <dt>Batting</dt>
+                <dd>Tap Single, Double, Triple, Home Run, Walk, or Out for the current batter. Runners on base advance automatically.</dd>
+              </div>
+              <div>
+                <dt>Moving runners</dt>
+                <dd>Drag a runner by the dotted handle to any open base to correct where they are.</dd>
+              </div>
+              <div>
+                <dt>Scoring runs</dt>
+                <dd>When a runner reaches Home, tap Scored to count the run. If they didn't actually score, tap the X and drag them to where they are.</dd>
+              </div>
+              <div>
+                <dt>Hold</dt>
+                <dd>Drop a runner on Hold to set them aside while you reorganize the bases, then drag them back to a base, Home, or Out.</dd>
+              </div>
+              <div>
+                <dt>Outs</dt>
+                <dd>Drop a runner on Out, or tap the X on their tile, to record an out.</dd>
+              </div>
+              <div>
+                <dt>Undo</dt>
+                <dd>The arrow at the top right reverses the last play.</dd>
+              </div>
+            </dl>
+          </section>
+        </div>
+      )}
     </div>
   )
 }
@@ -1592,6 +1697,13 @@ function HomeScoringSlot({
   pendingScorer,
   pendingScorerCount,
 }: HomeScoringSlotProps) {
+  const [isRelocating, setIsRelocating] = useState(false)
+  const pendingScorerId = pendingScorer?.id
+
+  useEffect(() => {
+    setIsRelocating(false)
+  }, [pendingScorerId])
+
   const isPreviewTarget = dragPreviewTarget === 'home' && draggedRunnerSource !== 'home'
   const previewClass = [
     isPreviewTarget ? 'preview-target' : '',
@@ -1655,17 +1767,38 @@ function HomeScoringSlot({
               <circle cx="10.5" cy="12" r="1" />
             </svg>
           </button>
-          <div className="home-score-card-main">
-            <strong>{pendingScorer.name}</strong>
-            <em>Scored? Drag back if not</em>
-          </div>
-          <div className="home-score-actions">
-            <button className="home-score-action primary" type="button" aria-label={`Confirm ${pendingScorer.name} scored`} onClick={onConfirmRun}>
-              <svg viewBox="0 0 16 16" aria-hidden="true">
-                <path d="m4 8.25 2.25 2.25L12 5" />
-              </svg>
-            </button>
-          </div>
+          {isRelocating ? (
+            <>
+              <div className="home-score-card-main">
+                <span className="relocate-hint">Drag <strong>{pendingScorer.name}</strong> to where they are</span>
+              </div>
+              <button className="relocate-back-button" type="button" aria-label={`Back, ${pendingScorer.name} scored`} onClick={() => setIsRelocating(false)}>
+                <svg viewBox="0 0 16 16" aria-hidden="true">
+                  <path d="M10 3.5 5.5 8 10 12.5" />
+                </svg>
+                Back
+              </button>
+            </>
+          ) : (
+            <>
+              <div className="home-score-card-main">
+                <strong>{pendingScorer.name}</strong>
+              </div>
+              <div className="home-score-actions">
+                <button className="deny-score-button" type="button" aria-label={`${pendingScorer.name} did not score`} onClick={() => setIsRelocating(true)}>
+                  <svg viewBox="0 0 16 16" aria-hidden="true">
+                    <path d="M4 4l8 8M12 4l-8 8" />
+                  </svg>
+                </button>
+                <button className="confirm-score-button" type="button" aria-label={`Confirm ${pendingScorer.name} scored`} onClick={onConfirmRun}>
+                  <svg viewBox="0 0 16 16" aria-hidden="true">
+                    <path d="m4 8.25 2.25 2.25L12 5" />
+                  </svg>
+                  Scored
+                </button>
+              </div>
+            </>
+          )}
           {pendingScorerCount > 1 && <span className="home-score-queue">+{pendingScorerCount - 1}</span>}
         </div>
       )}
@@ -2073,12 +2206,12 @@ function GameActionPanel({
                 </p>
               )}
               <div className="batting-actions-grid">
-                <button type="button" disabled={isHoldingRunner} onClick={() => onHit(1)}>Single</button>
-                <button type="button" disabled={isHoldingRunner} onClick={() => onHit(2)}>Double</button>
-                <button type="button" disabled={isHoldingRunner} onClick={() => onHit(3)}>Triple</button>
-                <button type="button" disabled={isHoldingRunner} onClick={() => onHit(4)}>Home Run</button>
+                <button className="hit-action" type="button" disabled={isHoldingRunner} onClick={() => onHit(1)}>Single</button>
+                <button className="hit-action" type="button" disabled={isHoldingRunner} onClick={() => onHit(2)}>Double</button>
+                <button className="hit-action" type="button" disabled={isHoldingRunner} onClick={() => onHit(3)}>Triple</button>
+                <button className="hit-action" type="button" disabled={isHoldingRunner} onClick={() => onHit(4)}>Home Run</button>
                 <button className="walk-action" type="button" disabled={isHoldingRunner} onClick={onWalk}>Walk</button>
-                <button type="button" disabled={isHoldingRunner} onClick={onOut}>Out</button>
+                <button className="out-action" type="button" disabled={isHoldingRunner} onClick={onOut}>Out</button>
               </div>
             </div>
           ) : (
