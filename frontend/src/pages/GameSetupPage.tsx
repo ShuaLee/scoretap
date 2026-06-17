@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 export type TeamKey = 'teamOne' | 'teamTwo'
 
@@ -411,6 +411,7 @@ function TeamSetupCard({
   const displayName = name.trim() || placeholder
   const isPreviewingSwap = draggedPlayer?.team === team && dropTarget?.team === team
   const previewRows = players.map((player, index) => ({ player, sourceIndex: index }))
+  const touchDropIndexRef = useRef<number | null>(null)
 
   if (isPreviewingSwap && draggedPlayer.index !== dropTarget.index) {
     const targetRow = previewRows[dropTarget.index]
@@ -469,6 +470,7 @@ function TeamSetupCard({
                     isDropPosition ? 'drop-target' : '',
                   ].filter(Boolean).join(' ')}
                   key={index}
+                  data-player-index={index}
                   onDragEnd={onDragEnd}
                   onDragOver={(event) => {
                     event.preventDefault()
@@ -483,6 +485,31 @@ function TeamSetupCard({
                     role="button"
                     aria-label={`Drag ${player || `player ${index + 1}`}`}
                     onDragStart={() => onDragStart(index)}
+                    onTouchStart={(e) => {
+                      e.preventDefault()
+                      touchDropIndexRef.current = index
+                      onDragStart(index)
+                    }}
+                    onTouchMove={(e) => {
+                      e.preventDefault()
+                      const touch = e.touches[0]
+                      const el = document.elementFromPoint(touch.clientX, touch.clientY)
+                      const tile = el?.closest('[data-player-index]')
+                      if (tile) {
+                        const i = Number(tile.getAttribute('data-player-index'))
+                        if (i !== touchDropIndexRef.current) {
+                          touchDropIndexRef.current = i
+                          onDragOver(i)
+                        }
+                      }
+                    }}
+                    onTouchEnd={() => {
+                      if (touchDropIndexRef.current !== null) {
+                        onDrop(touchDropIndexRef.current)
+                      }
+                      touchDropIndexRef.current = null
+                      onDragEnd()
+                    }}
                   />
                   <span className="player-order">{index + 1}</span>
                   <input

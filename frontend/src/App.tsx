@@ -34,6 +34,7 @@ export default function App() {
   function beginGame(config: GameConfig) {
     setGameConfig(config)
     setStoredGame(null)
+    setIsScoreEditorOpen(false)
     localStorage.removeItem(ACTIVE_GAME_STORAGE_KEY)
     setPage('score-game')
   }
@@ -41,6 +42,7 @@ export default function App() {
   function startOrContinueGame() {
     if (storedGame) {
       setGameConfig(storedGame.gameConfig)
+      setIsScoreEditorOpen(false)
       setPage('score-game')
       return
     }
@@ -187,6 +189,29 @@ type WaitlistModalProps = {
 }
 
 function WaitlistModal({ onClose }: WaitlistModalProps) {
+  const [status, setStatus] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle')
+
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setStatus('submitting')
+    const form = event.currentTarget
+    const data = new FormData(form)
+    try {
+      const res = await fetch('https://formspree.io/f/mgobqqyy', {
+        method: 'POST',
+        body: data,
+        headers: { Accept: 'application/json' },
+      })
+      if (res.ok) {
+        setStatus('success')
+      } else {
+        setStatus('error')
+      }
+    } catch {
+      setStatus('error')
+    }
+  }
+
   return (
     <div className="modal-backdrop" role="presentation">
       <section
@@ -200,11 +225,20 @@ function WaitlistModal({ onClose }: WaitlistModalProps) {
         </button>
         <span className="modal-eyebrow">Launch updates</span>
         <h2 id="waitlist-modal-title">Join the waitlist</h2>
-        <p>Enter your email and we will let you know when the full app is ready.</p>
-        <form className="modal-waitlist-form" onSubmit={(event) => event.preventDefault()}>
-          <input type="email" placeholder="Email address" autoFocus />
-          <button type="submit">Join Waitlist</button>
-        </form>
+        {status === 'success' ? (
+          <p>You're on the list! We'll be in touch.</p>
+        ) : (
+          <>
+            <p>Enter your email and we will let you know when the full app is ready.</p>
+            <form className="modal-waitlist-form" onSubmit={handleSubmit}>
+              <input type="email" name="email" placeholder="Email address" autoFocus required />
+              <button type="submit" disabled={status === 'submitting'}>
+                {status === 'submitting' ? 'Joining…' : 'Join Waitlist'}
+              </button>
+            </form>
+            {status === 'error' && <p className="form-error">Something went wrong. Please try again.</p>}
+          </>
+        )}
       </section>
     </div>
   )

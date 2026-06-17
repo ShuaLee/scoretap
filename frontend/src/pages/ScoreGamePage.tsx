@@ -1452,6 +1452,37 @@ function BaseOccupancy({
     onMoveRunner(source, target)
   }
 
+  function handleTouchPreview(zone: string | null) {
+    setIsOutZoneTargeted(zone === 'out')
+    setIsHoldZoneTargeted(zone === 'hold')
+    if (zone === 'first' || zone === 'second' || zone === 'third' || zone === 'home') {
+      setDragPreviewTarget(zone as RunnerSource)
+    } else {
+      setDragPreviewTarget(null)
+    }
+  }
+
+  function handleTouchDrop(source: RunnerSource, zone: string) {
+    if (zone === 'out') {
+      const srcBaseKey = source === 'first' || source === 'second' || source === 'third' ? source : null
+      if (srcBaseKey) {
+        const runner = bases[srcBaseKey]
+        if (runner) onRequestRunnerOut(runner, srcBaseKey)
+      } else if (source === 'home') {
+        onPendingScorerOut()
+      } else if (source === 'holding') {
+        onHeldRunnerOut()
+      }
+    } else if (zone === 'hold') {
+      const srcBaseKey = source === 'first' || source === 'second' || source === 'third' ? source : null
+      if (srcBaseKey) onHoldRunner(srcBaseKey)
+      else if (source === 'home') onHoldPendingScorer()
+    } else if (zone === 'first' || zone === 'second' || zone === 'third' || zone === 'home') {
+      handleMoveRunner(source, zone as RunnerSource)
+    }
+    handleDragEnd()
+  }
+
   return (
     <div className="base-area">
       <section className="base-occupancy-card" aria-label="Base runners">
@@ -1472,9 +1503,9 @@ function BaseOccupancy({
             </button>
           </div>
         </div>
-        <BaseSlot baseKey="third" className="base-slot-3b" dragPreviewTarget={dragPreviewTarget} isPreviewBlocked={Boolean(movePreview?.blocked && dragPreviewTarget === 'third')} label="3B" runner={previewBases.third} draggedRunnerSource={draggedRunnerSource} onDragEnd={handleDragEnd} onDragStart={onDragStart} onMoveRunner={handleMoveRunner} onPreviewTargetChange={setDragPreviewTarget} onRequestRunnerOut={onRequestRunnerOut} />
-        <BaseSlot baseKey="second" className="base-slot-2b" dragPreviewTarget={dragPreviewTarget} isPreviewBlocked={Boolean(movePreview?.blocked && dragPreviewTarget === 'second')} label="2B" runner={previewBases.second} draggedRunnerSource={draggedRunnerSource} onDragEnd={handleDragEnd} onDragStart={onDragStart} onMoveRunner={handleMoveRunner} onPreviewTargetChange={setDragPreviewTarget} onRequestRunnerOut={onRequestRunnerOut} />
-        <BaseSlot baseKey="first" className="base-slot-1b" dragPreviewTarget={dragPreviewTarget} isPreviewBlocked={Boolean(movePreview?.blocked && dragPreviewTarget === 'first')} label="1B" runner={previewBases.first} draggedRunnerSource={draggedRunnerSource} onDragEnd={handleDragEnd} onDragStart={onDragStart} onMoveRunner={handleMoveRunner} onPreviewTargetChange={setDragPreviewTarget} onRequestRunnerOut={onRequestRunnerOut} />
+        <BaseSlot baseKey="third" className="base-slot-3b" dragPreviewTarget={dragPreviewTarget} isPreviewBlocked={Boolean(movePreview?.blocked && dragPreviewTarget === 'third')} label="3B" runner={previewBases.third} draggedRunnerSource={draggedRunnerSource} onDragEnd={handleDragEnd} onDragStart={onDragStart} onMoveRunner={handleMoveRunner} onPreviewTargetChange={setDragPreviewTarget} onRequestRunnerOut={onRequestRunnerOut} onTouchDrop={handleTouchDrop} onTouchPreview={handleTouchPreview} />
+        <BaseSlot baseKey="second" className="base-slot-2b" dragPreviewTarget={dragPreviewTarget} isPreviewBlocked={Boolean(movePreview?.blocked && dragPreviewTarget === 'second')} label="2B" runner={previewBases.second} draggedRunnerSource={draggedRunnerSource} onDragEnd={handleDragEnd} onDragStart={onDragStart} onMoveRunner={handleMoveRunner} onPreviewTargetChange={setDragPreviewTarget} onRequestRunnerOut={onRequestRunnerOut} onTouchDrop={handleTouchDrop} onTouchPreview={handleTouchPreview} />
+        <BaseSlot baseKey="first" className="base-slot-1b" dragPreviewTarget={dragPreviewTarget} isPreviewBlocked={Boolean(movePreview?.blocked && dragPreviewTarget === 'first')} label="1B" runner={previewBases.first} draggedRunnerSource={draggedRunnerSource} onDragEnd={handleDragEnd} onDragStart={onDragStart} onMoveRunner={handleMoveRunner} onPreviewTargetChange={setDragPreviewTarget} onRequestRunnerOut={onRequestRunnerOut} onTouchDrop={handleTouchDrop} onTouchPreview={handleTouchPreview} />
         <HomeScoringSlot
           dragPreviewTarget={dragPreviewTarget}
           draggedRunnerSource={draggedRunnerSource}
@@ -1486,6 +1517,8 @@ function BaseOccupancy({
           onDragStart={onDragStart}
           onMoveRunner={handleMoveRunner}
           onPreviewTargetChange={setDragPreviewTarget}
+          onTouchDrop={handleTouchDrop}
+          onTouchPreview={handleTouchPreview}
         />
         <div
           className={[
@@ -1494,6 +1527,7 @@ function BaseOccupancy({
             isOutZoneTargeted && canDropOut ? 'targeted' : '',
           ].filter(Boolean).join(' ')}
           aria-label="Drop runner here to record an out"
+          data-drop-zone="out"
           onDragEnter={() => {
             if (canDropOut) {
               setIsOutZoneTargeted(true)
@@ -1529,6 +1563,7 @@ function BaseOccupancy({
               isHoldZoneTargeted && canDropOnHold ? 'targeted' : '',
             ].filter(Boolean).join(' ')}
             aria-label="Drop runner here to hold while reorganizing bases"
+            data-drop-zone="hold"
             onDragEnter={() => {
               if (canDropOnHold) {
                 setIsHoldZoneTargeted(true)
@@ -1555,6 +1590,7 @@ function BaseOccupancy({
         {heldRunner && (
           <div
             className={isHoldZoneTargeted && canDropOnHold ? 'drag-hold-zone occupied targeted' : 'drag-hold-zone occupied'}
+            data-drop-zone="hold"
             onDragEnter={() => {
               if (canDropOnHold) {
                 setIsHoldZoneTargeted(true)
@@ -1582,6 +1618,24 @@ function BaseOccupancy({
               draggable
               onDragEnd={handleDragEnd}
               onDragStart={(event) => handleHoldingDragStart(event, heldRunner)}
+              onTouchStart={(e) => {
+                e.preventDefault()
+                onDragStart('holding')
+              }}
+              onTouchMove={(e) => {
+                e.preventDefault()
+                const touch = e.touches[0]
+                const el = document.elementFromPoint(touch.clientX, touch.clientY)
+                const zone = el?.closest('[data-drop-zone]')?.getAttribute('data-drop-zone') ?? null
+                handleTouchPreview(zone)
+              }}
+              onTouchEnd={(e) => {
+                const touch = e.changedTouches[0]
+                const el = document.elementFromPoint(touch.clientX, touch.clientY)
+                const zone = el?.closest('[data-drop-zone]')?.getAttribute('data-drop-zone')
+                if (zone) handleTouchDrop('holding', zone)
+                else handleDragEnd()
+              }}
             >
               <svg viewBox="0 0 16 16" aria-hidden="true">
                 <circle cx="5.5" cy="4" r="1" />
@@ -1681,6 +1735,8 @@ type HomeScoringSlotProps = {
   onMoveRunner: (source: RunnerSource, target: RunnerSource) => void
   onPreviewTargetChange: (target: RunnerSource | null) => void
   onConfirmRun: () => void
+  onTouchDrop?: (source: RunnerSource, zone: string) => void
+  onTouchPreview?: (zone: string | null) => void
   pendingScorer: Runner | null
   pendingScorerCount: number
 }
@@ -1694,6 +1750,8 @@ function HomeScoringSlot({
   onDragStart,
   onMoveRunner,
   onPreviewTargetChange,
+  onTouchDrop,
+  onTouchPreview,
   pendingScorer,
   pendingScorerCount,
 }: HomeScoringSlotProps) {
@@ -1731,6 +1789,7 @@ function HomeScoringSlot({
   return (
     <div
       className={`base-slot base-slot-home${pendingScorer ? ' has-runner' : ''}${previewClass ? ` ${previewClass}` : ''}`}
+      data-drop-zone="home"
       onDragEnter={() => {
         if (draggedRunnerSource && draggedRunnerSource !== 'home') {
           onPreviewTargetChange('home')
@@ -1757,7 +1816,32 @@ function HomeScoringSlot({
       )}
       {pendingScorer && (
         <div className="home-score-card">
-          <button className="runner-drag-handle" type="button" aria-label={`Drag ${pendingScorer.name}`} draggable onDragEnd={onDragEnd} onDragStart={handleDragStart}>
+          <button
+            className="runner-drag-handle"
+            type="button"
+            aria-label={`Drag ${pendingScorer.name}`}
+            draggable
+            onDragEnd={onDragEnd}
+            onDragStart={handleDragStart}
+            onTouchStart={(e) => {
+              e.preventDefault()
+              onDragStart('home')
+            }}
+            onTouchMove={(e) => {
+              e.preventDefault()
+              const touch = e.touches[0]
+              const el = document.elementFromPoint(touch.clientX, touch.clientY)
+              const zone = el?.closest('[data-drop-zone]')?.getAttribute('data-drop-zone') ?? null
+              onTouchPreview?.(zone)
+            }}
+            onTouchEnd={(e) => {
+              const touch = e.changedTouches[0]
+              const el = document.elementFromPoint(touch.clientX, touch.clientY)
+              const zone = el?.closest('[data-drop-zone]')?.getAttribute('data-drop-zone')
+              if (zone) onTouchDrop?.('home', zone)
+              else onDragEnd()
+            }}
+          >
             <svg viewBox="0 0 16 16" aria-hidden="true">
               <circle cx="5.5" cy="4" r="1" />
               <circle cx="10.5" cy="4" r="1" />
@@ -1818,10 +1902,12 @@ type BaseSlotProps = {
   onMoveRunner: (source: RunnerSource, target: RunnerSource) => void
   onPreviewTargetChange: (target: RunnerSource | null) => void
   onRequestRunnerOut: (runner: Runner, source: BaseKey) => void
+  onTouchDrop?: (source: RunnerSource, zone: string) => void
+  onTouchPreview?: (zone: string | null) => void
   runner?: Runner | null
 }
 
-function BaseSlot({ baseKey, className, dragPreviewTarget, draggedRunnerSource, isPreviewBlocked, label, onDragEnd, onDragStart, onMoveRunner, onPreviewTargetChange, onRequestRunnerOut, runner }: BaseSlotProps) {
+function BaseSlot({ baseKey, className, dragPreviewTarget, draggedRunnerSource, isPreviewBlocked, label, onDragEnd, onDragStart, onMoveRunner, onPreviewTargetChange, onRequestRunnerOut, onTouchDrop, onTouchPreview, runner }: BaseSlotProps) {
   const isPreviewTarget = dragPreviewTarget === baseKey && draggedRunnerSource !== baseKey
   const isDragOrigin = draggedRunnerSource === baseKey
   const previewClass = [
@@ -1835,6 +1921,7 @@ function BaseSlot({ baseKey, className, dragPreviewTarget, draggedRunnerSource, 
   return (
     <div
       className={`base-slot ${className}${runner ? ' has-runner' : ''}${previewClass ? ` ${previewClass}` : ''}`}
+      data-drop-zone={baseKey}
       onDragEnter={() => {
         if (draggedRunnerSource && draggedRunnerSource !== baseKey) {
           onPreviewTargetChange(baseKey)
@@ -1867,6 +1954,8 @@ function BaseSlot({ baseKey, className, dragPreviewTarget, draggedRunnerSource, 
           onDragEnd={onDragEnd}
           onDragStart={onDragStart}
           onRequestRunnerOut={onRequestRunnerOut}
+          onTouchDrop={onTouchDrop}
+          onTouchPreview={onTouchPreview}
         />
       )}
     </div>
@@ -1878,11 +1967,13 @@ type RunnerTileProps = {
   onDragEnd?: () => void
   onDragStart?: (source: RunnerSource) => void
   onRequestRunnerOut?: (runner: Runner, source: BaseKey) => void
+  onTouchDrop?: (source: RunnerSource, zone: string) => void
+  onTouchPreview?: (zone: string | null) => void
   runner: Runner
   source: RunnerSource
 }
 
-function RunnerTile({ baseLabel, onDragEnd, onDragStart, onRequestRunnerOut, runner, source }: RunnerTileProps) {
+function RunnerTile({ baseLabel, onDragEnd, onDragStart, onRequestRunnerOut, onTouchDrop, onTouchPreview, runner, source }: RunnerTileProps) {
   const isBaseRunner = source !== 'atBat'
   const [isConfirmingOut, setIsConfirmingOut] = useState(false)
 
@@ -1925,7 +2016,35 @@ function RunnerTile({ baseLabel, onDragEnd, onDragStart, onRequestRunnerOut, run
       )}
       {isBaseRunner && baseLabel && !isConfirmingOut && (
         <>
-          <button className="runner-drag-handle" type="button" aria-label={`Drag ${runner.name}`} draggable onDragEnd={onDragEnd} onDragStart={handleDragStart}>
+          <button
+            className="runner-drag-handle"
+            type="button"
+            aria-label={`Drag ${runner.name}`}
+            draggable
+            onDragEnd={onDragEnd}
+            onDragStart={handleDragStart}
+            onTouchStart={(e) => {
+              e.preventDefault()
+              onDragStart?.(source)
+            }}
+            onTouchMove={(e) => {
+              e.preventDefault()
+              const touch = e.touches[0]
+              const el = document.elementFromPoint(touch.clientX, touch.clientY)
+              const zone = el?.closest('[data-drop-zone]')?.getAttribute('data-drop-zone') ?? null
+              onTouchPreview?.(zone)
+            }}
+            onTouchEnd={(e) => {
+              const touch = e.changedTouches[0]
+              const el = document.elementFromPoint(touch.clientX, touch.clientY)
+              const zone = el?.closest('[data-drop-zone]')?.getAttribute('data-drop-zone')
+              if (zone) {
+                onTouchDrop?.(source, zone)
+              } else {
+                onDragEnd?.()
+              }
+            }}
+          >
             <svg viewBox="0 0 16 16" aria-hidden="true">
               <circle cx="5.5" cy="4" r="1" />
               <circle cx="10.5" cy="4" r="1" />
@@ -2385,9 +2504,6 @@ function RosterSettingsModal({
                   isEditing ? (
                     <div className="section-edit-actions">
                       <button className="section-confirm-button" type="button" onClick={() => setIsEditing(false)}>Confirm</button>
-                      <button className="section-cancel-button" type="button" aria-label="Close editing" onClick={() => setIsEditing(false)}>
-                        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" /></svg>
-                      </button>
                     </div>
                   ) : (
                     <button className="section-edit-button" type="button" onClick={() => setIsEditing(true)}>Edit</button>

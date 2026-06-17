@@ -2,6 +2,10 @@
   box-sizing: border-box;
 }
 
+html {
+  overflow-x: hidden;
+}
+
 :root {
   --color-primary: #d09040;
   --color-primary-hover: #b8792f;
@@ -38,6 +42,7 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
+  overflow-x: hidden;
   background: var(--color-surface);
   color: var(--color-text);
   font-family:
@@ -476,12 +481,22 @@ body {
   background:
     radial-gradient(circle at 50% 40%, rgba(var(--color-primary-rgb), 0.18), transparent 48%),
     var(--color-cream);
+  overflow: hidden;
 }
 
-.home-mockup svg {
-  display: block;
+.home-mockup-preview {
+  position: relative;
   width: min(100%, 520px);
-  filter: drop-shadow(0 24px 48px rgba(15, 23, 42, 0.18));
+}
+
+.home-mockup-img {
+  display: block;
+  width: 100%;
+  border-radius: 16px;
+  box-shadow: 0 24px 48px rgba(15, 23, 42, 0.18);
+  opacity: 0.92;
+  mask-image: linear-gradient(to bottom, black 55%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, black 55%, transparent 100%);
 }
 
 .game-setup-page {
@@ -1621,6 +1636,7 @@ body {
   justify-self: center;
   width: 14px;
   height: 18px;
+  touch-action: none;
   cursor: grab;
   background-image:
     radial-gradient(circle, #94a3b8 1.15px, transparent 1.25px),
@@ -2144,6 +2160,7 @@ body {
   border-radius: 8px;
   background: transparent;
   color: var(--color-muted);
+  touch-action: none;
   padding: 0;
   cursor: grab;
   touch-action: none;
@@ -5153,8 +5170,12 @@ body {
 }
 
 @media (max-width: 760px) {
+  .top-nav-inner {
+    padding: 8px 16px;
+  }
+
   .create-game-page {
-    padding: 24px 16px 88px;
+    padding: 24px 12px 88px;
   }
 
   .create-game-grid {
@@ -5173,6 +5194,27 @@ body {
   .setup-field-row {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .team-setup-heading {
+    grid-template-columns: 1fr;
+    gap: 8px;
+    min-height: unset;
+    padding: 10px 12px;
+  }
+
+  .team-card-controls {
+    gap: 6px;
+  }
+
+  .team-mode-action {
+    flex: 1;
+    min-width: 0;
+    justify-content: center;
+  }
+
+  .home-status {
+    flex-shrink: 0;
   }
 
   .create-game-actions {
