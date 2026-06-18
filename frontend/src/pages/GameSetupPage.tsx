@@ -566,7 +566,12 @@ function TeamSetupCard({
           </>
         ) : (
           <div className="lineup-disabled-message">
-            <p>Batting order and at-bats are not tracked. Runs are entered per inning for this team.</p>
+            <div className="lineup-disabled-tile">
+              <svg viewBox="0 0 16 16" aria-hidden="true">
+                <path d="M8 1.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13Zm0 3.25v.5m0 2v3.5" />
+              </svg>
+              <span>Runs only — entered per inning, no batting order.</span>
+            </div>
           </div>
         )}
       </div>
