@@ -412,6 +412,8 @@ function TeamSetupCard({
   const isPreviewingSwap = draggedPlayer?.team === team && dropTarget?.team === team
   const previewRows = players.map((player, index) => ({ player, sourceIndex: index }))
   const touchDropIndexRef = useRef<number | null>(null)
+  const touchGhostRef = useRef<HTMLElement | null>(null)
+  const touchOffsetRef = useRef({ x: 0, y: 0 })
 
   if (isPreviewingSwap && draggedPlayer.index !== dropTarget.index) {
     const targetRow = previewRows[dropTarget.index]
@@ -489,10 +491,24 @@ function TeamSetupCard({
                       e.preventDefault()
                       touchDropIndexRef.current = index
                       onDragStart(index)
+                      const touch = e.touches[0]
+                      const tile = (e.currentTarget as HTMLElement).closest('.player-tile')
+                      if (tile instanceof HTMLElement) {
+                        const rect = tile.getBoundingClientRect()
+                        touchOffsetRef.current = { x: touch.clientX - rect.left, y: touch.clientY - rect.top }
+                        const ghost = tile.cloneNode(true) as HTMLElement
+                        ghost.style.cssText = `position:fixed;pointer-events:none;z-index:9999;width:${rect.width}px;left:${rect.left}px;top:${rect.top}px;opacity:0.92;box-shadow:0 8px 24px rgba(0,0,0,0.18);border-radius:10px;background:#fff;`
+                        document.body.appendChild(ghost)
+                        touchGhostRef.current = ghost
+                      }
                     }}
                     onTouchMove={(e) => {
                       e.preventDefault()
                       const touch = e.touches[0]
+                      if (touchGhostRef.current) {
+                        touchGhostRef.current.style.left = `${touch.clientX - touchOffsetRef.current.x}px`
+                        touchGhostRef.current.style.top = `${touch.clientY - touchOffsetRef.current.y}px`
+                      }
                       const el = document.elementFromPoint(touch.clientX, touch.clientY)
                       const tile = el?.closest('[data-player-index]')
                       if (tile) {
@@ -504,6 +520,8 @@ function TeamSetupCard({
                       }
                     }}
                     onTouchEnd={() => {
+                      touchGhostRef.current?.remove()
+                      touchGhostRef.current = null
                       if (touchDropIndexRef.current !== null) {
                         onDrop(touchDropIndexRef.current)
                       }

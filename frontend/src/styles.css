@@ -5182,15 +5182,21 @@ body {
   }
 
   .create-game-page {
-    padding: 24px 12px 88px;
+    padding: 24px 16px 88px;
   }
 
   .create-game-grid {
     grid-template-columns: 1fr;
   }
 
+  .create-game-stack {
+    width: 100%;
+    overflow: hidden;
+  }
+
   .team-card-grid {
     grid-template-columns: minmax(0, 1fr);
+    overflow: hidden;
   }
 
   .create-game-card {

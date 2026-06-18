@@ -1415,6 +1415,8 @@ function BaseOccupancy({
   const [isOutZoneTargeted, setIsOutZoneTargeted] = useState(false)
   const [isHoldZoneTargeted, setIsHoldZoneTargeted] = useState(false)
   const [isInfoOpen, setIsInfoOpen] = useState(false)
+  const holdTouchGhostRef = useRef<HTMLElement | null>(null)
+  const holdTouchOffsetRef = useRef({ x: 0, y: 0 })
   const movePreview = draggedRunnerSource && dragPreviewTarget ? onGetMovePreview(draggedRunnerSource, dragPreviewTarget) : null
   const previewBases = bases
   const draggedBaseKey = draggedRunnerSource === 'first' || draggedRunnerSource === 'second' || draggedRunnerSource === 'third'
@@ -1621,15 +1623,31 @@ function BaseOccupancy({
               onTouchStart={(e) => {
                 e.preventDefault()
                 onDragStart('holding')
+                const touch = e.touches[0]
+                const tile = (e.currentTarget as HTMLElement).closest('.drag-hold-zone')
+                if (tile instanceof HTMLElement) {
+                  const rect = tile.getBoundingClientRect()
+                  holdTouchOffsetRef.current = { x: touch.clientX - rect.left, y: touch.clientY - rect.top }
+                  const ghost = tile.cloneNode(true) as HTMLElement
+                  ghost.style.cssText = `position:fixed;pointer-events:none;z-index:9999;width:${rect.width}px;left:${rect.left}px;top:${rect.top}px;opacity:0.92;box-shadow:0 8px 24px rgba(0,0,0,0.2);border-radius:12px;`
+                  document.body.appendChild(ghost)
+                  holdTouchGhostRef.current = ghost
+                }
               }}
               onTouchMove={(e) => {
                 e.preventDefault()
                 const touch = e.touches[0]
+                if (holdTouchGhostRef.current) {
+                  holdTouchGhostRef.current.style.left = `${touch.clientX - holdTouchOffsetRef.current.x}px`
+                  holdTouchGhostRef.current.style.top = `${touch.clientY - holdTouchOffsetRef.current.y}px`
+                }
                 const el = document.elementFromPoint(touch.clientX, touch.clientY)
                 const zone = el?.closest('[data-drop-zone]')?.getAttribute('data-drop-zone') ?? null
                 handleTouchPreview(zone)
               }}
               onTouchEnd={(e) => {
+                holdTouchGhostRef.current?.remove()
+                holdTouchGhostRef.current = null
                 const touch = e.changedTouches[0]
                 const el = document.elementFromPoint(touch.clientX, touch.clientY)
                 const zone = el?.closest('[data-drop-zone]')?.getAttribute('data-drop-zone')
@@ -1757,6 +1775,8 @@ function HomeScoringSlot({
 }: HomeScoringSlotProps) {
   const [isRelocating, setIsRelocating] = useState(false)
   const pendingScorerId = pendingScorer?.id
+  const touchGhostRef = useRef<HTMLElement | null>(null)
+  const touchOffsetRef = useRef({ x: 0, y: 0 })
 
   useEffect(() => {
     setIsRelocating(false)
@@ -1826,15 +1846,31 @@ function HomeScoringSlot({
             onTouchStart={(e) => {
               e.preventDefault()
               onDragStart('home')
+              const touch = e.touches[0]
+              const tile = (e.currentTarget as HTMLElement).closest('.home-score-card')
+              if (tile instanceof HTMLElement) {
+                const rect = tile.getBoundingClientRect()
+                touchOffsetRef.current = { x: touch.clientX - rect.left, y: touch.clientY - rect.top }
+                const ghost = tile.cloneNode(true) as HTMLElement
+                ghost.style.cssText = `position:fixed;pointer-events:none;z-index:9999;width:${rect.width}px;left:${rect.left}px;top:${rect.top}px;opacity:0.92;box-shadow:0 8px 24px rgba(0,0,0,0.2);border-radius:12px;`
+                document.body.appendChild(ghost)
+                touchGhostRef.current = ghost
+              }
             }}
             onTouchMove={(e) => {
               e.preventDefault()
               const touch = e.touches[0]
+              if (touchGhostRef.current) {
+                touchGhostRef.current.style.left = `${touch.clientX - touchOffsetRef.current.x}px`
+                touchGhostRef.current.style.top = `${touch.clientY - touchOffsetRef.current.y}px`
+              }
               const el = document.elementFromPoint(touch.clientX, touch.clientY)
               const zone = el?.closest('[data-drop-zone]')?.getAttribute('data-drop-zone') ?? null
               onTouchPreview?.(zone)
             }}
             onTouchEnd={(e) => {
+              touchGhostRef.current?.remove()
+              touchGhostRef.current = null
               const touch = e.changedTouches[0]
               const el = document.elementFromPoint(touch.clientX, touch.clientY)
               const zone = el?.closest('[data-drop-zone]')?.getAttribute('data-drop-zone')
@@ -1976,6 +2012,8 @@ type RunnerTileProps = {
 function RunnerTile({ baseLabel, onDragEnd, onDragStart, onRequestRunnerOut, onTouchDrop, onTouchPreview, runner, source }: RunnerTileProps) {
   const isBaseRunner = source !== 'atBat'
   const [isConfirmingOut, setIsConfirmingOut] = useState(false)
+  const touchGhostRef = useRef<HTMLElement | null>(null)
+  const touchOffsetRef = useRef({ x: 0, y: 0 })
 
   function handleDragStart(event: DragEvent<HTMLButtonElement>) {
     const runnerTile = event.currentTarget.closest('.score-runner-tile')
@@ -2026,15 +2064,31 @@ function RunnerTile({ baseLabel, onDragEnd, onDragStart, onRequestRunnerOut, onT
             onTouchStart={(e) => {
               e.preventDefault()
               onDragStart?.(source)
+              const touch = e.touches[0]
+              const tile = (e.currentTarget as HTMLElement).closest('.score-runner-tile')
+              if (tile instanceof HTMLElement) {
+                const rect = tile.getBoundingClientRect()
+                touchOffsetRef.current = { x: touch.clientX - rect.left, y: touch.clientY - rect.top }
+                const ghost = tile.cloneNode(true) as HTMLElement
+                ghost.style.cssText = `position:fixed;pointer-events:none;z-index:9999;width:${rect.width}px;left:${rect.left}px;top:${rect.top}px;opacity:0.92;box-shadow:0 8px 24px rgba(0,0,0,0.2);border-radius:12px;`
+                document.body.appendChild(ghost)
+                touchGhostRef.current = ghost
+              }
             }}
             onTouchMove={(e) => {
               e.preventDefault()
               const touch = e.touches[0]
+              if (touchGhostRef.current) {
+                touchGhostRef.current.style.left = `${touch.clientX - touchOffsetRef.current.x}px`
+                touchGhostRef.current.style.top = `${touch.clientY - touchOffsetRef.current.y}px`
+              }
               const el = document.elementFromPoint(touch.clientX, touch.clientY)
               const zone = el?.closest('[data-drop-zone]')?.getAttribute('data-drop-zone') ?? null
               onTouchPreview?.(zone)
             }}
             onTouchEnd={(e) => {
+              touchGhostRef.current?.remove()
+              touchGhostRef.current = null
               const touch = e.changedTouches[0]
               const el = document.elementFromPoint(touch.clientX, touch.clientY)
               const zone = el?.closest('[data-drop-zone]')?.getAttribute('data-drop-zone')
